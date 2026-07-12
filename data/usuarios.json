@@ -4,7 +4,7 @@
     "nombre": "Administrador General",
     "usuario": "admin",
     "password": "admin123",
-    "rol": "Administrador General"
+    "rol": "Super Admin"
   },
   {
     "id": "usr-002",
@@ -16,8 +16,15 @@
   {
     "id": "usr-003",
     "nombre": "Carlos Mendoza",
-    "usuario": "director",
-    "password": "dir123",
-    "rol": "Director de Recorrido"
+    "usuario": "secretario1",
+    "password": "sec123",
+    "rol": "Pro Secretario"
+  },
+  {
+    "id": "usr-004",
+    "nombre": "Mayordomía",
+    "usuario": "mayordomo1",
+    "password": "mayor123",
+    "rol": "Mayordomía"
   }
 ]

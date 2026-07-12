@@ -1,9 +1,79 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 from datetime import datetime, timedelta
+from functools import wraps
 import json, os, uuid
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'hermandad-nazarenas-2024')
+
+# ── ROLES Y PERMISOS ──────────────────────
+# Cada rol tiene acceso a un conjunto de "secciones" del sistema.
+ROLES_PERMISOS = {
+    'Super Admin':     ['dashboard', 'recorridos', 'cuadrillas', 'homenajes', 'mapa', 'reportes', 'tablet', 'usuarios'],
+    'Mayordomía':      ['dashboard', 'mapa'],
+    'Pro Secretario':  ['recorridos', 'cuadrillas', 'homenajes'],
+    'Cronometrista':   ['tablet', 'reportes'],
+}
+
+# Endpoint al que se redirige por defecto para cada sección
+SECCION_ENDPOINT = {
+    'dashboard':  'dashboard',
+    'recorridos': 'recorridos',
+    'cuadrillas': 'cuadrillas',
+    'homenajes':  'homenajes',
+    'mapa':       'mapa_view',
+    'reportes':   'reporte_marcaciones',
+    'tablet':     'tablet',
+    'usuarios':   'usuarios',
+}
+
+def tiene_acceso(rol, seccion):
+    return seccion in ROLES_PERMISOS.get(rol, [])
+
+def ruta_inicio(rol):
+    permitidas = ROLES_PERMISOS.get(rol, [])
+    if not permitidas:
+        return url_for('login')
+    return url_for(SECCION_ENDPOINT[permitidas[0]])
+
+@app.context_processor
+def inject_permisos():
+    return dict(tiene_acceso=tiene_acceso)
+
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if 'usuario' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return wrapper
+
+def requiere_seccion(seccion):
+    """Protege una página: exige login y que el rol tenga acceso a la sección."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if 'usuario' not in session:
+                return redirect(url_for('login'))
+            if not tiene_acceso(session['usuario'].get('rol'), seccion):
+                flash('No tienes permiso para acceder a esa sección.', 'error')
+                return redirect(ruta_inicio(session['usuario'].get('rol')))
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def requiere_seccion_api(seccion):
+    """Protege un endpoint JSON: exige login y acceso a la sección, sin redirigir."""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if 'usuario' not in session:
+                return jsonify({'error': 'No autorizado'}), 401
+            if not tiene_acceso(session['usuario'].get('rol'), seccion):
+                return jsonify({'error': 'Permiso denegado'}), 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -146,9 +216,10 @@ def init_data():
 
     if not os.path.exists(os.path.join(DATA_DIR, 'usuarios.json')):
         usuarios = [
-            {"id": "usr-001", "nombre": "Administrador General", "usuario": "admin",       "password": "admin123", "rol": "Administrador General"},
+            {"id": "usr-001", "nombre": "Administrador General", "usuario": "admin",       "password": "admin123", "rol": "Super Admin"},
             {"id": "usr-002", "nombre": "Juan Ríos",             "usuario": "cronometro1", "password": "cron123",  "rol": "Cronometrista"},
-            {"id": "usr-003", "nombre": "Carlos Mendoza",        "usuario": "director",    "password": "dir123",   "rol": "Director de Recorrido"},
+            {"id": "usr-003", "nombre": "Carlos Mendoza",        "usuario": "secretario1", "password": "sec123",   "rol": "Pro Secretario"},
+            {"id": "usr-004", "nombre": "Mayordomía",            "usuario": "mayordomo1",  "password": "mayor123", "rol": "Mayordomía"},
         ]
         save_data('usuarios.json', usuarios)
 
@@ -159,7 +230,7 @@ init_data()
 def index():
     if 'usuario' not in session:
         return redirect(url_for('login'))
-    return redirect(url_for('dashboard'))
+    return redirect(ruta_inicio(session['usuario'].get('rol')))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -171,7 +242,7 @@ def login():
         user = next((u for u in usuarios if u['usuario'] == usuario and u['password'] == password), None)
         if user:
             session['usuario'] = user
-            return redirect(url_for('dashboard'))
+            return redirect(ruta_inicio(user.get('rol')))
         error = 'Usuario o contraseña incorrectos'
     return render_template('login.html', error=error)
 
@@ -182,9 +253,8 @@ def logout():
 
 # ── DASHBOARD ────────────────────────────
 @app.route('/dashboard')
+@requiere_seccion('dashboard')
 def dashboard():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     from datetime import date
     recorridos = load_data('recorridos.json')
     rid = request.args.get('rid', recorridos[0]['id'] if recorridos else 'rec-001')
@@ -207,13 +277,12 @@ def dashboard():
         homenajes=homenajes,
         usuario=session['usuario'])
 
-ROLES_ADMIN = ['Administrador General', 'Super Admin']
+ROLES_ADMIN = ['Super Admin']
 
 # ── RECORRIDOS ────────────────────────────
 @app.route('/recorridos')
+@requiere_seccion('recorridos')
 def recorridos():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     recorridos_data = load_data('recorridos.json')
     cuadrillas_data = load_data('cuadrillas.json')
     homenajes_data  = load_data('homenajes.json')
@@ -235,9 +304,8 @@ def recorridos():
         usuario=session['usuario'])
 
 @app.route('/recorridos/editar/<rid>', methods=['POST'])
+@requiere_seccion('recorridos')
 def editar_recorrido(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = load_data('recorridos.json')
     for r in data:
         if r['id'] == rid:
@@ -256,9 +324,8 @@ def editar_recorrido(rid):
     return redirect(url_for('recorridos'))
 
 @app.route('/recorridos/eliminar/<rid>', methods=['POST'])
+@requiere_seccion('recorridos')
 def eliminar_recorrido(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     if session['usuario'].get('rol') not in ROLES_ADMIN:
         return redirect(url_for('recorridos'))
     save_data('recorridos.json',  [r for r in load_data('recorridos.json')  if r['id'] != rid])
@@ -268,9 +335,8 @@ def eliminar_recorrido(rid):
     return redirect(url_for('recorridos'))
 
 @app.route('/recorridos/nuevo', methods=['GET', 'POST'])
+@requiere_seccion('recorridos')
 def nuevo_recorrido():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     if request.method == 'POST':
         data = load_data('recorridos.json')
         data.append({
@@ -290,9 +356,8 @@ def nuevo_recorrido():
 
 # ── CUADRILLAS ────────────────────────────
 @app.route('/cuadrillas')
+@requiere_seccion('cuadrillas')
 def cuadrillas():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     recorridos_data = load_data('recorridos.json')
     rutas = {r['id']: r.get('ruta_coords', []) for r in recorridos_data}
     return render_template('cuadrillas.html',
@@ -303,9 +368,8 @@ def cuadrillas():
         usuario=session['usuario'])
 
 @app.route('/cuadrillas/nueva', methods=['POST'])
+@requiere_seccion('cuadrillas')
 def nueva_cuadrilla():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = load_data('cuadrillas.json')
     tipo = request.form.get('tipo', 'regular')
     hermandad = request.form.get('hermandad_invitada', '') if tipo == 'invitados' else ''
@@ -332,9 +396,8 @@ def nueva_cuadrilla():
     return redirect(url_for('cuadrillas'))
 
 @app.route('/cuadrillas/editar/<cid>', methods=['POST'])
+@requiere_seccion('cuadrillas')
 def editar_cuadrilla(cid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = load_data('cuadrillas.json')
     tipo = request.form.get('tipo', 'regular')
     hermandad = request.form.get('hermandad_invitada', '') if tipo == 'invitados' else ''
@@ -361,27 +424,24 @@ def editar_cuadrilla(cid):
     return redirect(url_for('cuadrillas'))
 
 @app.route('/cuadrillas/eliminar/<cid>', methods=['POST'])
+@requiere_seccion('cuadrillas')
 def eliminar_cuadrilla(cid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = [c for c in load_data('cuadrillas.json') if c['id'] != cid]
     save_data('cuadrillas.json', data)
     return redirect(url_for('cuadrillas'))
 
 # ── HOMENAJES ────────────────────────────
 @app.route('/homenajes')
+@requiere_seccion('homenajes')
 def homenajes():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     return render_template('homenajes.html',
         homenajes=load_data('homenajes.json'),
         recorridos=load_data('recorridos.json'),
         usuario=session['usuario'])
 
 @app.route('/homenajes/editar/<hid>', methods=['POST'])
+@requiere_seccion('homenajes')
 def editar_homenaje(hid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = load_data('homenajes.json')
     for h in data:
         if h['id'] == hid:
@@ -399,17 +459,15 @@ def editar_homenaje(hid):
     return redirect(url_for('homenajes'))
 
 @app.route('/homenajes/eliminar/<hid>', methods=['POST'])
+@requiere_seccion('homenajes')
 def eliminar_homenaje(hid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = [h for h in load_data('homenajes.json') if h['id'] != hid]
     save_data('homenajes.json', data)
     return redirect(url_for('homenajes'))
 
 @app.route('/homenajes/nuevo', methods=['POST'])
+@requiere_seccion('homenajes')
 def nuevo_homenaje():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     data = load_data('homenajes.json')
     nc_raw = request.form.get('numero_cuadrilla', '').strip()
     data.append({
@@ -428,9 +486,8 @@ def nuevo_homenaje():
 
 # ── TABLET ────────────────────────────────
 @app.route('/tablet')
+@requiere_seccion('tablet')
 def tablet():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     from datetime import date
     return render_template('tablet.html',
         recorridos=load_data('recorridos.json'),
@@ -441,9 +498,8 @@ def tablet():
         usuario=session['usuario'])
 
 @app.route('/api/evento', methods=['POST'])
+@requiere_seccion_api('tablet')
 def registrar_evento():
-    if 'usuario' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
     body = request.get_json()
     eventos = load_data('eventos.json')
     rid = body.get('recorrido_id', 'rec-001')
@@ -592,6 +648,7 @@ def api_eventos_recientes():
     return jsonify(filtrados[-15:])
 
 @app.route('/api/reset', methods=['POST'])
+@requiere_seccion_api('dashboard')
 def reset_eventos():
     save_data('eventos.json', [])
     return jsonify({'ok': True})
@@ -599,9 +656,8 @@ def reset_eventos():
 # ── MAPA ──────────────────────────────────
 @app.route('/mapa')
 @app.route('/mapa/<rid>')
+@requiere_seccion('mapa')
 def mapa_view(rid=None):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     recorridos = load_data('recorridos.json')
     if rid is None:
         rid = recorridos[0]['id'] if recorridos else 'rec-001'
@@ -629,9 +685,8 @@ def api_posicion_get():
     })
 
 @app.route('/api/posicion', methods=['POST'])
+@requiere_seccion_api('mapa')
 def api_posicion_set():
-    if 'usuario' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
     body = request.get_json()
     rid = body.get('rid', 'rec-001')
     recorridos = load_data('recorridos.json')
@@ -651,9 +706,8 @@ def api_posicion_set():
     return jsonify({'ok': True, 'wp': wp_actual, 'waypoint': waypoints[wp_actual] if waypoints else None})
 
 @app.route('/recorridos/trazar/<rid>')
+@requiere_seccion('recorridos')
 def trazar_recorrido(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     recorridos = load_data('recorridos.json')
     rec = next((r for r in recorridos if r['id'] == rid), None)
     if not rec:
@@ -665,9 +719,8 @@ def trazar_recorrido(rid):
     return render_template('trazador.html', recorrido=rec, cuadrillas=cuadrillas, usuario=session['usuario'])
 
 @app.route('/api/ruta/guardar', methods=['POST'])
+@requiere_seccion_api('recorridos')
 def guardar_ruta():
-    if 'usuario' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
     body = request.get_json()
     rid    = body.get('rid')
     coords = body.get('coords', [])
@@ -770,9 +823,8 @@ def api_posicion_mapa():
     })
 
 @app.route('/api/posicion/reset', methods=['POST'])
+@requiere_seccion_api('mapa')
 def api_posicion_reset():
-    if 'usuario' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
     body = request.get_json()
     rid = body.get('rid', 'rec-001')
     posicion = load_posicion()
@@ -782,9 +834,8 @@ def api_posicion_reset():
 
 # ── REPORTES ──────────────────────────────
 @app.route('/reporte/toma-y-deja/<rid>')
+@requiere_seccion('reportes')
 def reporte_toma_y_deja(rid):
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     recorridos = load_data('recorridos.json')
     rec = next((r for r in recorridos if r['id'] == rid), None)
     if not rec:
@@ -807,9 +858,8 @@ def reporte_toma_y_deja(rid):
         usuario=session['usuario'])
 
 @app.route('/reporte/marcaciones')
+@requiere_seccion('reportes')
 def reporte_marcaciones():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
     recorridos = load_data('recorridos.json')
     cuas_all   = load_data('cuadrillas.json')
     homs_all   = load_data('homenajes.json')
@@ -900,6 +950,85 @@ def reporte_marcaciones():
         cua_idx=cua_idx,
         hom_idx=hom_idx,
         usuario=session['usuario'])
+
+# ── USUARIOS ──────────────────────────────
+@app.route('/usuarios')
+@requiere_seccion('usuarios')
+def usuarios():
+    return render_template('usuarios.html',
+        usuarios=load_data('usuarios.json'),
+        roles=list(ROLES_PERMISOS.keys()),
+        usuario=session['usuario'])
+
+@app.route('/usuarios/nuevo', methods=['POST'])
+@requiere_seccion('usuarios')
+def nuevo_usuario():
+    nombre   = request.form.get('nombre', '').strip()
+    usuario_ = request.form.get('usuario', '').strip()
+    password = request.form.get('password', '').strip()
+    rol      = request.form.get('rol', '')
+    data = load_data('usuarios.json')
+    if not nombre or not usuario_ or not password or rol not in ROLES_PERMISOS:
+        flash('Todos los campos son obligatorios y el rol debe ser válido.', 'error')
+        return redirect(url_for('usuarios'))
+    if any(u['usuario'] == usuario_ for u in data):
+        flash(f'Ya existe un usuario con el nombre de acceso "{usuario_}".', 'error')
+        return redirect(url_for('usuarios'))
+    data.append({
+        "id": f"usr-{str(uuid.uuid4())[:8]}",
+        "nombre": nombre,
+        "usuario": usuario_,
+        "password": password,
+        "rol": rol,
+    })
+    save_data('usuarios.json', data)
+    flash(f'Usuario "{usuario_}" creado correctamente.', 'success')
+    return redirect(url_for('usuarios'))
+
+@app.route('/usuarios/editar/<uid>', methods=['POST'])
+@requiere_seccion('usuarios')
+def editar_usuario(uid):
+    nombre   = request.form.get('nombre', '').strip()
+    usuario_ = request.form.get('usuario', '').strip()
+    password = request.form.get('password', '').strip()
+    rol      = request.form.get('rol', '')
+    data = load_data('usuarios.json')
+    if not nombre or not usuario_ or rol not in ROLES_PERMISOS:
+        flash('Todos los campos son obligatorios y el rol debe ser válido.', 'error')
+        return redirect(url_for('usuarios'))
+    if any(u['usuario'] == usuario_ and u['id'] != uid for u in data):
+        flash(f'Ya existe un usuario con el nombre de acceso "{usuario_}".', 'error')
+        return redirect(url_for('usuarios'))
+    for u in data:
+        if u['id'] == uid:
+            u['nombre']  = nombre
+            u['usuario'] = usuario_
+            u['rol']     = rol
+            if password:
+                u['password'] = password
+            if session['usuario']['id'] == uid:
+                session['usuario'] = u
+            break
+    save_data('usuarios.json', data)
+    flash('Usuario actualizado correctamente.', 'success')
+    return redirect(url_for('usuarios'))
+
+@app.route('/usuarios/eliminar/<uid>', methods=['POST'])
+@requiere_seccion('usuarios')
+def eliminar_usuario(uid):
+    if uid == session['usuario']['id']:
+        flash('No puedes eliminar tu propio usuario.', 'error')
+        return redirect(url_for('usuarios'))
+    data = load_data('usuarios.json')
+    objetivo = next((u for u in data if u['id'] == uid), None)
+    if objetivo and objetivo.get('rol') == 'Super Admin':
+        otros_admins = [u for u in data if u.get('rol') == 'Super Admin' and u['id'] != uid]
+        if not otros_admins:
+            flash('No puedes eliminar al único Super Admin del sistema.', 'error')
+            return redirect(url_for('usuarios'))
+    save_data('usuarios.json', [u for u in data if u['id'] != uid])
+    flash('Usuario eliminado.', 'success')
+    return redirect(url_for('usuarios'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

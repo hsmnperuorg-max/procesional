@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Usuarios{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fa fa-users-gear" style="color:var(--morado)"></i> Gestión de Usuarios</h1>
+    <p>Perfiles y accesos del sistema</p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('modal-usr').classList.add('open')">
+    <i class="fa fa-plus"></i> Nuevo Usuario
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2><i class="fa fa-list"></i> Usuarios Registrados ({{ usuarios|length }})</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td><strong>{{ u.nombre }}</strong></td>
+          <td>{{ u.usuario }}</td>
+          <td><span class="badge badge-morado">{{ u.rol }}</span></td>
+          <td style="display:flex;gap:6px">
+            <button type="button" class="btn btn-sm btn-outline"
+                    data-id="{{ u.id }}"
+                    onclick="abrirEditarUsr(this)">
+              <i class="fa fa-pencil"></i>
+            </button>
+            <form method="POST" action="/usuarios/eliminar/{{ u.id }}" onsubmit="return confirm('¿Eliminar este usuario?')">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="text-align:center;color:var(--gris-text);padding:40px">No hay usuarios registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-header">
+    <h2><i class="fa fa-shield-halved"></i> Qué puede ver cada rol</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rol</th><th>Secciones con acceso</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-morado">Super Admin</span></td><td>Todo el sistema, incluyendo Usuarios</td></tr>
+        <tr><td><span class="badge badge-morado">Mayordomía</span></td><td>Dashboard y Mapa</td></tr>
+        <tr><td><span class="badge badge-morado">Pro Secretario</span></td><td>Recorridos, Cuadrillas y Homenajes</td></tr>
+        <tr><td><span class="badge badge-morado">Cronometrista</span></td><td>Tablet de Campo y Reportes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo usuario -->
+<div class="modal-overlay" id="modal-usr">
+  <div class="modal">
+    <h3><i class="fa fa-user-plus" style="color:var(--morado)"></i> Nuevo Usuario</h3>
+    <form method="POST" action="/usuarios/nuevo">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nombre Completo</label>
+          <input type="text" name="nombre" placeholder="Ej: Carlos Mendoza" required>
+        </div>
+        <div class="form-group">
+          <label>Usuario (para iniciar sesión)</label>
+          <input type="text" name="usuario" placeholder="Ej: cmendoza" required>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="text" name="password" placeholder="Contraseña" required>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Rol / Perfil</label>
+          <select name="rol" required>
+            {% for r in roles %}
+            <option value="{{ r }}">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar</button>
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-usr').classList.remove('open')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal editar usuario -->
+<div class="modal-overlay" id="modal-edit-usr">
+  <div class="modal">
+    <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Usuario</h3>
+    <form method="POST" id="form-edit-usr">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nombre Completo</label>
+          <input type="text" name="nombre" id="edit-usr-nombre" required>
+        </div>
+        <div class="form-group">
+          <label>Usuario (para iniciar sesión)</label>
+          <input type="text" name="usuario" id="edit-usr-usuario" required>
+        </div>
+        <div class="form-group">
+          <label>Contraseña <span style="font-size:10px;color:var(--gris-text)">(dejar vacío para no cambiarla)</span></label>
+          <input type="text" name="password" id="edit-usr-password" placeholder="Nueva contraseña">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Rol / Perfil</label>
+          <select name="rol" id="edit-usr-rol" required>
+            {% for r in roles %}
+            <option value="{{ r }}">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cambios</button>
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-edit-usr').classList.remove('open')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const USUARIOS_DATA = {{ usuarios | tojson }};
+
+function abrirEditarUsr(btn) {
+  const u = USUARIOS_DATA.find(x => x.id === btn.dataset.id);
+  if (!u) return;
+  const form = document.getElementById('form-edit-usr');
+  form.action = `/usuarios/editar/${u.id}`;
+  document.getElementById('edit-usr-nombre').value   = u.nombre;
+  document.getElementById('edit-usr-usuario').value  = u.usuario;
+  document.getElementById('edit-usr-password').value = '';
+  document.getElementById('edit-usr-rol').value      = u.rol;
+  document.getElementById('modal-edit-usr').classList.add('open');
+}
+
+document.getElementById('modal-usr').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+document.getElementById('modal-edit-usr').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+{% endblock %}

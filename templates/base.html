@@ -19,13 +19,30 @@
     </div>
   </div>
   <ul class="nav-links">
+    {% if tiene_acceso(session.usuario.rol, 'dashboard') %}
     <li><a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}"><i class="fa fa-gauge"></i> Dashboard</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'recorridos') %}
     <li><a href="/recorridos" class="{% if '/recorridos' in request.path %}active{% endif %}"><i class="fa fa-route"></i> Recorridos</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'cuadrillas') %}
     <li><a href="/cuadrillas" class="{% if '/cuadrillas' in request.path %}active{% endif %}"><i class="fa fa-people-group"></i> Cuadrillas</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'homenajes') %}
     <li><a href="/homenajes" class="{% if '/homenajes' in request.path %}active{% endif %}"><i class="fa fa-church"></i> Homenajes</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'mapa') %}
     <li><a href="/mapa" class="{% if '/mapa' in request.path %}active{% endif %}"><i class="fa fa-map-location-dot"></i> Mapa</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'reportes') %}
     <li><a href="/reporte/marcaciones" class="{% if '/reporte' in request.path %}active{% endif %}"><i class="fa fa-file-lines"></i> Reportes</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'tablet') %}
     <li><a href="/tablet" class="nav-tablet {% if '/tablet' in request.path %}active{% endif %}"><i class="fa fa-tablet"></i> Tablet Campo</a></li>
+    {% endif %}
+    {% if tiene_acceso(session.usuario.rol, 'usuarios') %}
+    <li><a href="/usuarios" class="{% if '/usuarios' in request.path %}active{% endif %}"><i class="fa fa-users-gear"></i> Usuarios</a></li>
+    {% endif %}
   </ul>
   <div class="nav-user">
     <span><i class="fa fa-user-circle"></i> {{ session.usuario.nombre }}</span>
