@@ -43,5 +43,16 @@
         -77.0372915
       ]
     ]
+  },
+  {
+    "id": "rec-f0f63989",
+    "nombre": "Recorrido Procesional de la Virgen del Carmen de Nazarenas",
+    "fecha": "2026-07-12",
+    "hora_salida": "17:30",
+    "hora_llegada_programada": "19:43",
+    "distancia_total": 520,
+    "observaciones": "",
+    "estado": "programado",
+    "color": "#6E1E91"
   }
 ]

@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "hom-vc01",
+    "recorrido_id": "rec-f0f63989",
+    "numero_cuadrilla": 1,
+    "nombre": "Homenaje Hermandad",
+    "ubicacion": "JR CHANCAY 451",
+    "tiempo_programado": 13,
+    "prioridad": "alta",
+    "cargo_a": "cuadrilla",
+    "observaciones": ""
+  }
+]
