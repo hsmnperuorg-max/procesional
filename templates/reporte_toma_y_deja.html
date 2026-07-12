@@ -32,10 +32,12 @@
 
 .cua-num {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: 50%;
-  background: #4B1462; color: white; font-weight: 900; font-size: 13px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #4B1462; color: white; font-weight: 900; font-size: 11.5px;
   flex-shrink: 0;
 }
+.cua-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cua-nombre { font-weight: 800; font-size: 10.5px; color: #4B1462; text-align: center; line-height: 1.2; }
 .hora-cell { font-weight: 700; color: #333; text-align: center; white-space: nowrap; font-size: 11px; }
 .toma-lbl  { font-weight: 700; color: #1a6e1a; }
 .deja-lbl  { font-weight: 700; color: #6e1a1a; }
@@ -109,7 +111,7 @@
   <table class="tyd-table">
     <thead>
       <tr>
-        <th style="width:56px">CUADRILLA</th>
+        <th style="width:100px">CUADRILLA</th>
         <th style="width:52px">HORA</th>
         <th>PUNTO DE INICIO Y/O TERMINO DE CARGUIO</th>
         <th style="width:70px">METRAJE</th>
@@ -140,7 +142,10 @@
         <!-- Fila TOMA -->
         <tr class="row-toma">
           <td rowspan="2" style="text-align:center;padding:6px 4px;border-bottom:2px solid #6E1E91">
-            <div class="cua-num">{{ c.numero }}</div>
+            <div class="cua-cell">
+              <div class="cua-num">{{ c.numero }}</div>
+              <div class="cua-nombre">{{ c.cuadrilla }}{% if c.tipo == 'invitados' and c.hermandad_invitada %}<br>{{ c.hermandad_invitada }}{% endif %}</div>
+            </div>
           </td>
           <td class="hora-cell">{{ c.hora_toma or '–:–' }}</td>
           <td><span class="toma-lbl">Toma:</span> {{ punto_toma }}</td>
