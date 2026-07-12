@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+{% block title %}Tablet de Campo{% endblock %}
+{% block content %}
+<div class="tablet-page">
+  <div class="tablet-header">
+    <div style="font-size:28px">✝</div>
+    <h1>Control de Campo</h1>
+    {% set es_superadmin = usuario.rol in ['Administrador General', 'Super Admin'] %}
+    {% if es_superadmin %}
+    <p style="margin-bottom:4px">
+      <span style="background:rgba(212,175,55,0.3);border:1px solid rgba(212,175,55,0.7);color:#D4AF37;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.5px">
+        ★ ADMINISTRADOR TOTAL
+      </span>
+    </p>
+    {% endif %}
+    <p>{{ usuario.rol }}: {{ usuario.nombre }}</p>
+    <p id="t-recorrido-label" style="font-size:13px;color:rgba(212,175,55,0.9);margin-top:4px;font-weight:600">Sin recorrido seleccionado</p>
+  </div>
+
+  <!-- Estado actual -->
+  <div class="tablet-status">
+    <div class="tablet-stat">
+      <div class="val" id="t-cuadrilla">–</div>
+      <div class="lbl">Cuadrilla Activa</div>
+    </div>
+    <div class="tablet-stat">
+      <div class="val" id="t-hora">–</div>
+      <div class="lbl">Hora Actual</div>
+    </div>
+    <div class="tablet-stat">
+      <div class="val" id="t-gps">–</div>
+      <div class="lbl">GPS</div>
+    </div>
+    <div class="tablet-stat">
+      <div class="val" id="t-estado">Libre</div>
+      <div class="lbl">Estado</div>
+    </div>
+  </div>
+
+  <!-- ① Selección de RECORRIDO — obligatorio antes de todo -->
+  <div id="bloque-recorrido" style="background:rgba(212,175,55,0.15);border:2px solid rgba(212,175,55,0.5);border-radius:10px;padding:14px;margin-bottom:16px">
+    <label style="color:var(--dorado,#D4AF37);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px;font-weight:700">
+      <i class="fa fa-route"></i>&nbsp; Recorrido activo — selecciona antes de registrar
+    </label>
+    <select id="sel-recorrido-tablet" onchange="cambiarRecorrido(this.value)"
+            style="width:100%;padding:12px;border-radius:8px;border:2px solid rgba(212,175,55,0.6);font-size:14px;background:#fff;font-weight:600;color:#2d0a3d">
+      <option value="">-- Elige el recorrido --</option>
+      {% for r in recorridos %}
+      <option value="{{ r.id }}"
+              data-nombre="{{ r.nombre }}"
+              {% if r.fecha == hoy %}data-vivo="1"{% endif %}>
+        {% if r.fecha == hoy %}🟢 EN VIVO — {% endif %}{{ r.nombre }} · {{ r.fecha }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- ② Selección de cuadrilla activa (se llena por JS según recorrido) -->
+  <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px">
+    <label style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar cuadrilla</label>
+    <select id="sel-cuadrilla" onchange="actualizarPanelTiempoCuadrilla()" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:#fff">
+      <option value="">-- Primero elige un recorrido --</option>
+    </select>
+  </div>
+
+  <!-- Panel de tiempo por cuadrilla (toma y deja + contador en vivo) -->
+  <div id="panel-tiempo-cuadrilla" style="display:none;background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:10px">
+      <span>Toma: <strong id="pt-toma" style="color:#fff">–</strong></span>
+      <span>Deja: <strong id="pt-deja" style="color:#fff">–</strong></span>
+      <span>Estimado: <strong id="pt-estimado" style="color:#fff">–</strong></span>
+    </div>
+    <div id="pt-badge" style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;margin-bottom:8px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">NO INICIADA</div>
+    <div id="pt-contador" style="font-size:38px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums">00:00</div>
+    <div id="pt-restante-label" style="font-size:13px;color:rgba(255,255,255,0.75);margin-top:4px">Selecciona una cuadrilla para ver su tiempo</div>
+  </div>
+
+  <!-- ③ Selección de homenaje (se llena por JS según recorrido) -->
+  <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:20px">
+    <label style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar homenaje</label>
+    <select id="sel-homenaje" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:#fff">
+      <option value="">-- Primero elige un recorrido --</option>
+    </select>
+  </div>
+
+  <!-- Botones de acción -->
+  <div class="btn-grid">
+    <button class="btn-tablet inicio-cua" onclick="registrar('inicio_cuadrilla')">
+      <i class="fa fa-play"></i>INICIO CUADRILLA
+    </button>
+    <button class="btn-tablet fin-cua" onclick="registrar('fin_cuadrilla')">
+      <i class="fa fa-stop"></i>FIN CUADRILLA
+    </button>
+    <button class="btn-tablet inicio-hom" onclick="registrar('inicio_homenaje')">
+      <i class="fa fa-church"></i>INICIO HOMENAJE
+    </button>
+    <button class="btn-tablet fin-hom" onclick="registrar('fin_homenaje')">
+      <i class="fa fa-check"></i>FIN HOMENAJE
+    </button>
+    <button class="btn-tablet" style="background:linear-gradient(135deg,#7d3c98,#5b2c6f)" onclick="registrar('inicio_cambio')">
+      <i class="fa fa-arrows-rotate"></i>INICIO CAMBIO
+    </button>
+    <button class="btn-tablet" style="background:linear-gradient(135deg,#555,#333)" onclick="registrar('fin_cambio')">
+      <i class="fa fa-check-double"></i>FIN CAMBIO
+    </button>
+    <button class="btn-tablet inicio-sec" onclick="registrar('inicio_sector')">
+      <i class="fa fa-map-pin"></i>INICIO DE SECTOR
+    </button>
+    <button class="btn-tablet fin-sec" onclick="registrar('fin_sector')">
+      <i class="fa fa-flag-checkered"></i>FIN DE SECTOR
+    </button>
+    <button class="btn-tablet observ" onclick="abrirObservacion()">
+      <i class="fa fa-note-sticky"></i>REGISTRAR OBSERVACIÓN
+    </button>
+  </div>
+
+  <!-- Log local -->
+  <div style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
+    <i class="fa fa-clock"></i> Últimos eventos registrados
+  </div>
+  <div class="log-tablet" id="log-tablet">
+    <div class="log-item"><span style="color:rgba(255,255,255,0.4)">Sin eventos aún en esta sesión</span></div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.3)"></div>
+</div>
+
+<!-- Modal observación -->
+<div class="modal-overlay" id="modal-obs">
+  <div class="modal">
+    <h3><i class="fa fa-note-sticky" style="color:var(--morado)"></i> Registrar Observación</h3>
+    <div class="form-group">
+      <label>Descripción de la observación</label>
+      <textarea id="obs-texto" rows="4" placeholder="Ej: Detención por homenaje no programado en Jr. Caylloma..." style="width:100%"></textarea>
+    </div>
+    <div class="form-actions" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="enviarObservacion()"><i class="fa fa-save"></i> Guardar</button>
+      <button class="btn btn-outline" onclick="document.getElementById('modal-obs').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Datos de todos los recorridos embebidos ──────────────────
+const CUADRILLAS_ALL = {{ cuadrillas | tojson }};
+const HOMENAJES_ALL  = {{ homenajes  | tojson }};
+
+let gpsLat = null, gpsLng = null;
+let recorridoActivo = '';   // recorrido_id seleccionado
+const logItems = [];
+
+// ── Reloj + contador de tiempo por cuadrilla ──────────────────
+setInterval(() => {
+  document.getElementById('t-hora').textContent =
+    new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  actualizarPanelTiempoCuadrilla();
+}, 1000);
+
+// ── Estado del servidor (cuadrilla activa + hora de inicio real) ──
+let cuadrillaActivaServer = null;   // {id, inicio}
+let cuadrillasFinalizadas = [];     // ids de cuadrillas con FIN CUADRILLA ya registrado
+let estadoPollId = null;
+
+function iniciarPollEstado() {
+  if (estadoPollId) clearInterval(estadoPollId);
+  actualizarEstadoServidor();
+  estadoPollId = setInterval(actualizarEstadoServidor, 5000);
+}
+function detenerPollEstado() {
+  if (estadoPollId) clearInterval(estadoPollId);
+  estadoPollId = null;
+  cuadrillaActivaServer = null;
+  cuadrillasFinalizadas = [];
+}
+async function actualizarEstadoServidor() {
+  if (!recorridoActivo) return;
+  try {
+    const resp = await fetch(`/api/estado?rid=${recorridoActivo}`);
+    const data = await resp.json();
+    cuadrillaActivaServer = (data.cuadrilla_activa && data.cuadrilla_activa_inicio)
+      ? { id: data.cuadrilla_activa.id, inicio: data.cuadrilla_activa_inicio }
+      : null;
+    cuadrillasFinalizadas = data.cuadrillas_completadas_ids || [];
+    actualizarPanelTiempoCuadrilla();
+  } catch (e) { /* silencioso: la tablet puede perder señal */ }
+}
+
+// ── Bloqueo de cuadrilla ya finalizada ────────────────────────
+// Una vez registrado FIN CUADRILLA, esa cuadrilla queda bloqueada para
+// nuevas modificaciones (inicio/fin cuadrilla, inicio/fin sector) hasta
+// que se seleccione otra cuadrilla u otro item (homenaje) en la tablet.
+function aplicarBloqueoCuadrilla(cid) {
+  const bloqueada = !!cid && cuadrillasFinalizadas.includes(cid);
+  document.querySelectorAll('.inicio-cua, .fin-cua, .inicio-sec, .fin-sec').forEach(btn => {
+    btn.disabled = bloqueada;
+  });
+  return bloqueada;
+}
+
+// ── Panel de tiempo asignado / contador en vivo por cuadrilla ─
+function parseFechaServidor(s) {
+  // "YYYY-MM-DD HH:MM:SS" registrado en hora local del servidor
+  const [fecha, hora] = s.split(' ');
+  const [y, m, d]      = fecha.split('-').map(Number);
+  const [hh, mm, ss]   = hora.split(':').map(Number);
+  return new Date(y, m - 1, d, hh, mm, ss).getTime();
+}
+function formatearHMS(totalSeg) {
+  const neg = totalSeg < 0;
+  totalSeg = Math.abs(totalSeg);
+  const h = Math.floor(totalSeg / 3600);
+  const m = Math.floor((totalSeg % 3600) / 60);
+  const s = totalSeg % 60;
+  const pad = n => String(n).padStart(2, '0');
+  const txt = h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+  return (neg ? '-' : '') + txt;
+}
+function actualizarPanelTiempoCuadrilla() {
+  const panel = document.getElementById('panel-tiempo-cuadrilla');
+  const cid = document.getElementById('sel-cuadrilla').value;
+  const bloqueada = aplicarBloqueoCuadrilla(cid);
+  if (!cid) { panel.style.display = 'none'; return; }
+
+  const c = CUADRILLAS_ALL.find(x => x.id === cid);
+  if (!c) { panel.style.display = 'none'; return; }
+
+  panel.style.display = 'block';
+  document.getElementById('pt-toma').textContent     = c.hora_toma || '–';
+  document.getElementById('pt-deja').textContent      = c.hora_deja || '–';
+  document.getElementById('pt-estimado').textContent  = (c.tiempo_estimado || 0) + ' min';
+
+  const badge      = document.getElementById('pt-badge');
+  const contador   = document.getElementById('pt-contador');
+  const restanteEl = document.getElementById('pt-restante-label');
+  const activa     = cuadrillaActivaServer && cuadrillaActivaServer.id === cid;
+
+  if (bloqueada) {
+    badge.textContent      = '🔒 FINALIZADA';
+    badge.style.background = 'rgba(192,57,43,0.25)';
+    badge.style.color      = '#c0392b';
+    contador.textContent   = '--:--';
+    contador.style.color   = '#c0392b';
+    restanteEl.textContent = 'Esta cuadrilla ya fue finalizada. Selecciona otra cuadrilla o item para continuar.';
+    return;
+  }
+
+  if (!activa) {
+    badge.textContent      = 'NO INICIADA';
+    badge.style.background = 'rgba(255,255,255,0.15)';
+    badge.style.color      = 'rgba(255,255,255,0.7)';
+    contador.textContent   = '00:00';
+    contador.style.color   = '#fff';
+    restanteEl.textContent = `Tiempo asignado: ${c.tiempo_estimado || 0} min`;
+    return;
+  }
+
+  const estimadoSeg    = (c.tiempo_estimado || 0) * 60;
+  const transcurridoSeg = Math.max(0, Math.floor((Date.now() - parseFechaServidor(cuadrillaActivaServer.inicio)) / 1000));
+  const restanteSeg    = estimadoSeg - transcurridoSeg;
+
+  contador.textContent = formatearHMS(transcurridoSeg);
+
+  if (restanteSeg >= 0) {
+    badge.textContent      = 'EN CURSO';
+    badge.style.background = 'rgba(39,174,96,0.25)';
+    badge.style.color      = '#27ae60';
+    contador.style.color   = '#27ae60';
+    restanteEl.textContent = `Restante: ${formatearHMS(restanteSeg)}`;
+  } else {
+    badge.textContent      = 'TIEMPO EXCEDIDO';
+    badge.style.background = 'rgba(192,57,43,0.25)';
+    badge.style.color      = '#c0392b';
+    contador.style.color   = '#c0392b';
+    restanteEl.textContent = `Excedido por: ${formatearHMS(-restanteSeg)}`;
+  }
+}
+
+// ── GPS ───────────────────────────────────────────────────────
+function obtenerGPS() {
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(pos => {
+      gpsLat = pos.coords.latitude.toFixed(5);
+      gpsLng = pos.coords.longitude.toFixed(5);
+      document.getElementById('t-gps').textContent = `${gpsLat},${gpsLng}`;
+    }, () => {
+      document.getElementById('t-gps').textContent = 'No disp.';
+      gpsLat = -12.0464; gpsLng = -77.0428;
+    });
+  } else {
+    gpsLat = -12.0464; gpsLng = -77.0428;
+    document.getElementById('t-gps').textContent = 'Simulado';
+  }
+}
+obtenerGPS();
+
+// ── Cambiar recorrido — filtra cuadrillas y homenajes ─────────
+function cambiarRecorrido(rid) {
+  recorridoActivo = rid;
+  localStorage.setItem('tablet_recorrido', rid);
+
+  const selCua = document.getElementById('sel-cuadrilla');
+  const selHom = document.getElementById('sel-homenaje');
+  const labelEl = document.getElementById('t-recorrido-label');
+  const bloqueEl = document.getElementById('bloque-recorrido');
+
+  if (!rid) {
+    selCua.innerHTML = '<option value="">-- Primero elige un recorrido --</option>';
+    selHom.innerHTML = '<option value="">-- Primero elige un recorrido --</option>';
+    labelEl.textContent = 'Sin recorrido seleccionado';
+    bloqueEl.style.borderColor = 'rgba(212,175,55,0.5)';
+    detenerPollEstado();
+    actualizarPanelTiempoCuadrilla();
+    return;
+  }
+
+  // Cuadrillas del recorrido, ordenadas por número
+  const cuas = CUADRILLAS_ALL
+    .filter(c => c.recorrido_id === rid)
+    .sort((a, b) => a.numero - b.numero);
+  selCua.innerHTML = '<option value="">-- Elige la cuadrilla --</option>' +
+    cuas.map(c =>
+      `<option value="${c.id}" data-nombre="${c.cuadrilla}" data-num="${c.numero}">Nº ${c.numero} – ${c.cuadrilla}</option>`
+    ).join('');
+
+  // Homenajes del recorrido
+  const homs = HOMENAJES_ALL.filter(h => h.recorrido_id === rid);
+  selHom.innerHTML = '<option value="">-- Elige el homenaje --</option>' +
+    homs.map(h =>
+      `<option value="${h.id}" data-nombre="${h.nombre}">${h.nombre} (${h.tiempo_programado} min)</option>`
+    ).join('');
+
+  // Mostrar nombre en header
+  const sel = document.getElementById('sel-recorrido-tablet');
+  const opt = sel.options[sel.selectedIndex];
+  labelEl.textContent = '📍 ' + (opt ? opt.dataset.nombre || opt.textContent.trim() : '');
+  bloqueEl.style.borderColor = 'rgba(39,174,96,0.7)';
+
+  actualizarPanelTiempoCuadrilla();
+  iniciarPollEstado();
+
+  mostrarToast('✓ Recorrido seleccionado. Cuadrillas y homenajes actualizados.', 'verde');
+}
+
+// ── Restaurar recorrido guardado ──────────────────────────────
+(function restaurar() {
+  const saved = localStorage.getItem('tablet_recorrido');
+  if (!saved) return;
+  const sel = document.getElementById('sel-recorrido-tablet');
+  // Verificar que sigue existiendo en la lista
+  const existe = Array.from(sel.options).some(o => o.value === saved);
+  if (existe) {
+    sel.value = saved;
+    cambiarRecorrido(saved);
+  }
+})();
+
+// ── Tipos legibles ────────────────────────────────────────────
+const TIPOS_LABEL = {
+  inicio_cuadrilla: '▶ Inicio cuadrilla',
+  fin_cuadrilla:    '⏹ Fin cuadrilla',
+  inicio_homenaje:  '🙏 Inicio homenaje',
+  fin_homenaje:     '✓ Fin homenaje',
+  inicio_cambio:    '🔄 Inicio cambio cuadrilla',
+  fin_cambio:       '✓ Fin cambio',
+  inicio_sector:    '📍 Inicio sector',
+  fin_sector:       '🏁 Fin sector',
+  observacion:      '📝 Observación',
+};
+
+// ── Registrar evento ──────────────────────────────────────────
+async function registrar(tipo, obs = '') {
+  // Validar recorrido seleccionado
+  if (!recorridoActivo) {
+    mostrarToast('⚠️ Debes seleccionar un recorrido primero', 'naranja');
+    document.getElementById('sel-recorrido-tablet').focus();
+    return;
+  }
+
+  const selCua = document.getElementById('sel-cuadrilla');
+  const selHom = document.getElementById('sel-homenaje');
+  const esHomenaje = tipo.includes('homenaje');
+  const refId = esHomenaje ? selHom.value : selCua.value;
+
+  const sinReferencia = ['observacion','inicio_cambio','fin_cambio'];
+  if (!refId && !sinReferencia.includes(tipo)) {
+    const esSector = tipo.includes('sector');
+    mostrarToast('⚠️ Selecciona una ' + (esHomenaje ? 'homenaje' : 'cuadrilla') + (esSector ? ' antes de registrar un sector' : '') + ' primero', 'naranja');
+    return;
+  }
+
+  // Bloqueo: una cuadrilla con FIN CUADRILLA ya registrado no admite más eventos
+  const tiposDeCuadrilla = ['inicio_cuadrilla', 'fin_cuadrilla', 'inicio_sector', 'fin_sector'];
+  if (tiposDeCuadrilla.includes(tipo) && cuadrillasFinalizadas.includes(refId)) {
+    mostrarToast('🔒 Esta cuadrilla ya fue finalizada. Selecciona otra cuadrilla o item para continuar.', 'naranja');
+    return;
+  }
+
+  const payload = {
+    tipo,
+    referencia_id:  refId,
+    lat:            gpsLat,
+    lng:            gpsLng,
+    observacion:    obs,
+    recorrido_id:   recorridoActivo,   // ← siempre el recorrido seleccionado
+  };
+
+  try {
+    const resp = await fetch('/api/evento', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      const hora  = data.evento.fecha_hora.split(' ')[1].substr(0, 5);
+      const label = TIPOS_LABEL[tipo] || tipo;
+      const nombre = esHomenaje
+        ? (selHom.options[selHom.selectedIndex]?.text || '')
+        : (selCua.options[selCua.selectedIndex]?.text || '');
+      logItems.unshift({ hora, label, nombre: obs || nombre });
+      renderLog();
+      mostrarToast('✓ ' + label + ' registrado', 'verde');
+      actualizarEstadoTablet();
+      actualizarEstadoServidor();
+    }
+  } catch(e) {
+    mostrarToast('❌ Error al registrar. Verifique conexión.', 'rojo');
+  }
+}
+
+function renderLog() {
+  const div = document.getElementById('log-tablet');
+  if (logItems.length === 0) {
+    div.innerHTML = '<div class="log-item"><span style="color:rgba(255,255,255,0.4)">Sin eventos aún</span></div>';
+    return;
+  }
+  div.innerHTML = logItems.slice(0, 20).map(i => `
+    <div class="log-item">
+      <span class="hora">${i.hora}</span>
+      <span>${i.label} ${i.nombre ? '· ' + i.nombre.substring(0, 40) : ''}</span>
+    </div>
+  `).join('');
+}
+
+function actualizarEstadoTablet() {
+  const selCua = document.getElementById('sel-cuadrilla');
+  if (selCua.value) {
+    const num = selCua.options[selCua.selectedIndex]?.dataset.num;
+    document.getElementById('t-cuadrilla').textContent = num ? '#' + num : '–';
+  }
+}
+
+function abrirObservacion() {
+  document.getElementById('modal-obs').classList.add('open');
+  document.getElementById('obs-texto').value = '';
+  document.getElementById('obs-texto').focus();
+}
+
+function enviarObservacion() {
+  const txt = document.getElementById('obs-texto').value.trim();
+  if (!txt) return;
+  document.getElementById('modal-obs').classList.remove('open');
+  registrar('observacion', txt);
+}
+
+function mostrarToast(msg, color = 'verde') {
+  const colores = { verde:'#27ae60', rojo:'#c0392b', naranja:'#e67e22' };
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = colores[color] || colores.verde;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+document.getElementById('modal-obs').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+{% endblock %}

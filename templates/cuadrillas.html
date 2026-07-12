@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+{% block title %}Cuadrillas{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fa fa-people-group" style="color:var(--morado)"></i> Gestión de Cuadrillas</h1>
+    <p>Define cada cuadrilla y fija su punto de relevo en el mapa para generar la ruta</p>
+  </div>
+  <button class="btn btn-primary" onclick="abrirNueva()">
+    <i class="fa fa-plus"></i> Nueva Cuadrilla
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2><i class="fa fa-list"></i> Cuadrillas Registradas ({{ cuadrillas|length }})</h2>
+    <span style="font-size:13px;color:var(--gris-text)">
+      Metros totales: <strong>{{ cuadrillas | sum(attribute='metraje') | int }} m</strong>
+      &nbsp;·&nbsp;
+      {% set con_pos = cuadrillas | selectattr('lat') | list | length %}
+      <span style="color:{% if con_pos == cuadrillas|length %}var(--verde){% else %}var(--naranja){% endif %}">
+        <i class="fa fa-map-pin"></i> {{ con_pos }}/{{ cuadrillas|length }} con punto en mapa
+      </span>
+    </span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Cuadrilla</th><th>Tipo</th><th>Hermandad Invitada</th><th>Ubicación / Punto</th><th>Metraje</th><th>T.Est.</th><th>Toma</th><th>Deja</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for c in cuadrillas | sort(attribute='numero') %}
+        <tr>
+          <td>
+            <span style="background:var(--morado);color:white;padding:3px 10px;border-radius:12px;font-weight:700;font-size:13px">{{ c.numero }}</span>
+          </td>
+          <td><strong>{{ c.cuadrilla }}</strong></td>
+          <td>
+            {% if c.tipo == 'honorarios' %}<span class="badge badge-dorado">Honorarios</span>
+            {% elif c.tipo == 'invitados' %}<span class="badge badge-morado">Invitados</span>
+            {% elif c.tipo == 'directorio_general' %}<span class="badge badge-rojo">Directorio General</span>
+            {% elif c.tipo == 'capataces' %}<span class="badge badge-naranja">Capataces</span>
+            {% elif c.tipo == 'dirigentes' %}<span class="badge badge-verde">Dirigentes</span>
+            {% elif c.tipo == 'adjuntos' %}<span class="badge badge-gris">Adjuntos</span>
+            {% else %}<span class="badge badge-gris">Regular</span>{% endif %}
+          </td>
+          <td style="font-size:13px;color:var(--morado)">
+            {% if c.hermandad_invitada %}<i class="fa fa-church"></i> {{ c.hermandad_invitada }}
+            {% else %}<span style="color:#ccc">—</span>{% endif %}
+          </td>
+          <td style="font-size:12px">
+            {% if c.ubicacion %}<div style="color:var(--gris-text)"><i class="fa fa-location-dot" style="color:var(--morado)"></i> {{ c.ubicacion }}</div>{% endif %}
+            {% if c.lat and c.lng %}
+              <div style="color:var(--verde);margin-top:2px">
+                <i class="fa fa-map-pin"></i> <span style="font-family:monospace;font-size:11px">{{ '%.5f'|format(c.lat) }}, {{ '%.5f'|format(c.lng) }}</span>
+              </div>
+            {% else %}
+              <div style="color:#ccc;margin-top:2px"><i class="fa fa-map-pin"></i> Sin punto en mapa</div>
+            {% endif %}
+          </td>
+          <td>{{ c.metraje }} m</td>
+          <td><span class="badge badge-morado">{{ c.tiempo_estimado }} min</span></td>
+          <td>{{ c.hora_toma }}</td>
+          <td>{{ c.hora_deja }}</td>
+          <td style="display:flex;gap:6px">
+            <button type="button" class="btn btn-sm btn-outline"
+                    data-id="{{ c.id }}" onclick="abrirEditar(this)">
+              <i class="fa fa-pencil"></i>
+            </button>
+            <form method="POST" action="/cuadrillas/eliminar/{{ c.id }}" onsubmit="return confirm('¿Eliminar esta cuadrilla?')">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" style="text-align:center;color:var(--gris-text);padding:40px">No hay cuadrillas registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nueva cuadrilla -->
+<div class="modal-overlay" id="modal-cua">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <h3><i class="fa fa-people-group" style="color:var(--morado)"></i> Nueva Cuadrilla</h3>
+    <form method="POST" action="/cuadrillas/nueva" id="form-cua">
+      <input type="hidden" name="lat" id="new-lat">
+      <input type="hidden" name="lng" id="new-lng">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Recorrido</label>
+          <select name="recorrido_id" id="new-recorrido" required>
+            {% for r in recorridos %}<option value="{{ r.id }}">{{ r.nombre }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Número de Orden</label>
+          <input type="number" name="numero" min="1" placeholder="Ej: 1" required>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Cuadrilla</label>
+          <select name="cuadrilla" id="sel-cuadrilla-nombre" required onchange="onCuadrillaChange(this.value)">
+            <option value="">-- Selecciona la cuadrilla --</option>
+            {% for c in lista_cuadrillas %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Tipo de Cuadrilla</label>
+          <select name="tipo" id="sel-tipo" onchange="onTipoChange(this.value)">
+            <option value="regular">Regular</option>
+            <option value="honorarios">Hermanos Honorarios</option>
+            <option value="invitados">Invitados</option>
+            <option value="directorio_general">Directorio General</option>
+            <option value="capataces">Capataces</option>
+            <option value="dirigentes">Dirigentes</option>
+            <option value="adjuntos">Adjuntos</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;display:none" id="campo-invitada">
+          <label>Nombre de la Hermandad Invitada</label>
+          <input type="text" name="hermandad_invitada" id="inp-hermandad"
+            placeholder="Ej: Hermandad del Señor de los Milagros de Surco" style="border:2px solid var(--morado)">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>
+            <i class="fa fa-location-dot" style="color:var(--morado)"></i>
+            Punto de Toma
+            <span style="font-size:10px;color:var(--gris-text)">— lugar exacto donde ESTA cuadrilla recibe las andas (Ej: 6.3m. Antes de Av. Tacna 312)</span>
+          </label>
+          <input type="text" name="ubicacion" placeholder="Ej: 6.3m. Antes de Av. Tacna 312 (SM)">
+        </div>
+
+        <!-- ÚLTIMA CUADRILLA -->
+        <div class="form-group" style="grid-column:1/-1">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+            <input type="checkbox" name="es_ultima" id="new-es-ultima" value="1"
+                   onchange="toggleUltima('new', this.checked)"
+                   style="width:18px;height:18px;accent-color:var(--morado);cursor:pointer">
+            <span>
+              <strong style="color:var(--morado)">Es la última cuadrilla del recorrido</strong>
+              <span style="font-size:11px;color:var(--gris-text);display:block">
+                Activa esta opción para ingresar el Punto de Deja final del recorrido
+              </span>
+            </span>
+          </label>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;display:none" id="new-campo-deja">
+          <label style="color:var(--morado)">
+            <i class="fa fa-flag-checkered"></i> Punto de Deja Final
+            <span style="font-size:10px;color:var(--gris-text)">— lugar donde esta última cuadrilla entrega las andas al llegar</span>
+          </label>
+          <input type="text" name="punto_deja" id="new-punto-deja"
+                 placeholder="Ej: Altar Mayor del Santuario Mariano Archidiocesano de la Santísima Virgen del Carmen Alto"
+                 style="border:2px solid var(--morado)">
+        </div>
+
+        <!-- PUNTO EN MAPA -->
+        <div class="form-group" style="grid-column:1/-1">
+          <label><i class="fa fa-map-pin" style="color:var(--morado)"></i> Punto de Relevo en Mapa <span style="color:var(--morado);font-size:10px">(mismo lugar que el Punto de Toma, fijado en el mapa)</span></label>
+          <div style="display:flex;align-items:center;gap:10px;background:#f8f5fc;border:1.5px solid #e0d0f0;border-radius:8px;padding:10px 14px">
+            <i class="fa fa-map-pin" style="color:{% if false %}var(--verde){% else %}#ccc{% endif %};font-size:18px" id="new-pin-icon"></i>
+            <span id="new-coords-display" style="font-size:13px;color:var(--gris-text);flex:1">Sin punto seleccionado — haz clic en "Fijar en mapa"</span>
+            <button type="button" class="btn btn-sm btn-outline" onclick="abrirPicker('new')">
+              <i class="fa fa-crosshairs"></i> Fijar en mapa
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Metraje (m)</label>
+          <input type="number" name="metraje" placeholder="300" value="300">
+        </div>
+        <div class="form-group">
+          <label>Tiempo Estimado (min)</label>
+          <input type="number" name="tiempo_estimado" placeholder="45" value="45">
+        </div>
+        <div class="form-group">
+          <label>Hora de Toma</label>
+          <input type="time" name="hora_toma" value="08:00">
+        </div>
+        <div class="form-group">
+          <label>Hora de Deja</label>
+          <input type="time" name="hora_deja" value="08:45">
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:20px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cuadrilla</button>
+        <button type="button" class="btn btn-outline" onclick="cerrarModal()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal editar cuadrilla -->
+<div class="modal-overlay" id="modal-edit-cua">
+  <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Cuadrilla</h3>
+    <form method="POST" id="form-edit-cua">
+      <input type="hidden" name="lat" id="edit-lat">
+      <input type="hidden" name="lng" id="edit-lng">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Recorrido</label>
+          <select name="recorrido_id" id="edit-recorrido" required>
+            {% for r in recorridos %}<option value="{{ r.id }}">{{ r.nombre }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Número de Orden</label>
+          <input type="number" name="numero" id="edit-numero" min="1" required>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Cuadrilla</label>
+          <select name="cuadrilla" id="edit-cuadrilla" required onchange="onEditCuadrillaChange(this.value)">
+            <option value="">-- Selecciona la cuadrilla --</option>
+            {% for c in lista_cuadrillas %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Tipo de Cuadrilla</label>
+          <select name="tipo" id="edit-tipo" onchange="onEditTipoChange(this.value)">
+            <option value="regular">Regular</option>
+            <option value="honorarios">Hermanos Honorarios</option>
+            <option value="invitados">Invitados</option>
+            <option value="directorio_general">Directorio General</option>
+            <option value="capataces">Capataces</option>
+            <option value="dirigentes">Dirigentes</option>
+            <option value="adjuntos">Adjuntos</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;display:none" id="edit-campo-invitada">
+          <label>Nombre de la Hermandad Invitada</label>
+          <input type="text" name="hermandad_invitada" id="edit-hermandad" style="border:2px solid var(--morado)">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>
+            <i class="fa fa-location-dot" style="color:var(--morado)"></i>
+            Punto de Toma
+            <span style="font-size:10px;color:var(--gris-text)">— lugar exacto donde ESTA cuadrilla recibe las andas</span>
+          </label>
+          <input type="text" name="ubicacion" id="edit-ubicacion" placeholder="Ej: 6.3m. Antes de Av. Tacna 312 (SM)">
+        </div>
+
+        <!-- ÚLTIMA CUADRILLA -->
+        <div class="form-group" style="grid-column:1/-1">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
+            <input type="checkbox" name="es_ultima" id="edit-es-ultima" value="1"
+                   onchange="toggleUltima('edit', this.checked)"
+                   style="width:18px;height:18px;accent-color:var(--morado);cursor:pointer">
+            <span>
+              <strong style="color:var(--morado)">Es la última cuadrilla del recorrido</strong>
+              <span style="font-size:11px;color:var(--gris-text);display:block">
+                Activa para ingresar el Punto de Deja final del recorrido
+              </span>
+            </span>
+          </label>
+        </div>
+        <div class="form-group" style="grid-column:1/-1;display:none" id="edit-campo-deja">
+          <label style="color:var(--morado)">
+            <i class="fa fa-flag-checkered"></i> Punto de Deja Final
+            <span style="font-size:10px;color:var(--gris-text)">— lugar donde esta última cuadrilla entrega las andas al llegar</span>
+          </label>
+          <input type="text" name="punto_deja" id="edit-punto-deja"
+                 placeholder="Ej: Altar Mayor del Santuario Mariano Archidiocesano..."
+                 style="border:2px solid var(--morado)">
+        </div>
+
+        <!-- PUNTO EN MAPA -->
+        <div class="form-group" style="grid-column:1/-1">
+          <label><i class="fa fa-map-pin" style="color:var(--morado)"></i> Punto de Relevo en Mapa</label>
+          <div style="display:flex;align-items:center;gap:10px;background:#f8f5fc;border:1.5px solid #e0d0f0;border-radius:8px;padding:10px 14px">
+            <i class="fa fa-map-pin" id="edit-pin-icon" style="font-size:18px;color:#ccc"></i>
+            <span id="edit-coords-display" style="font-size:13px;color:var(--gris-text);flex:1">Sin punto seleccionado</span>
+            <button type="button" class="btn btn-sm btn-outline" onclick="abrirPicker('edit')">
+              <i class="fa fa-crosshairs"></i> Fijar en mapa
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Metraje (m)</label>
+          <input type="number" name="metraje" id="edit-metraje">
+        </div>
+        <div class="form-group">
+          <label>Tiempo Estimado (min)</label>
+          <input type="number" name="tiempo_estimado" id="edit-tiempo">
+        </div>
+        <div class="form-group">
+          <label>Hora de Toma</label>
+          <input type="time" name="hora_toma" id="edit-hora-toma">
+        </div>
+        <div class="form-group">
+          <label>Hora de Deja</label>
+          <input type="time" name="hora_deja" id="edit-hora-deja">
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:20px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cambios</button>
+        <button type="button" class="btn btn-outline" onclick="cerrarModalEdit()">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal selector de mapa -->
+<div class="modal-overlay" id="modal-picker" style="z-index:600">
+  <div class="modal" style="max-width:720px;padding:20px">
+    <h3 style="margin-bottom:6px"><i class="fa fa-crosshairs" style="color:var(--morado)"></i> Fijar Punto de Relevo</h3>
+    <p style="font-size:13px;color:var(--gris-text);margin-bottom:12px">
+      Haz clic en el mapa para marcar el punto exacto donde esta cuadrilla <strong>deja la andas</strong>.
+    </p>
+    <div id="mapa-picker" style="height:400px;border-radius:8px;border:2px solid var(--morado);overflow:hidden"></div>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
+      <i class="fa fa-map-pin" id="picker-pin" style="font-size:20px;color:#ccc"></i>
+      <span id="picker-coords" style="font-size:14px;color:var(--gris-text)">Haz clic en el mapa…</span>
+    </div>
+    <div class="form-actions" style="margin-top:14px">
+      <button class="btn btn-primary" onclick="confirmarUbicacion()"><i class="fa fa-check"></i> Confirmar</button>
+      <button class="btn btn-outline" onclick="cerrarPicker()">Cancelar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const CUADRILLAS_DATA = {{ cuadrillas | tojson }};
+const RUTAS = {{ rutas_json | tojson }};
+
+// ── MODAL NUEVA ───────────────────────────
+function abrirNueva() {
+  document.getElementById('modal-cua').classList.add('open');
+}
+function cerrarModal() {
+  document.getElementById('modal-cua').classList.remove('open');
+}
+function onCuadrillaChange(val) {
+  const sel = document.getElementById('sel-tipo');
+  if (val === 'Hermanos Honorarios') sel.value = 'honorarios';
+  else if (val === 'Invitados')       sel.value = 'invitados';
+  else                                sel.value = 'regular';
+  onTipoChange(sel.value);
+}
+function onTipoChange(tipo) {
+  const campo = document.getElementById('campo-invitada');
+  const inp   = document.getElementById('inp-hermandad');
+  campo.style.display = tipo === 'invitados' ? 'block' : 'none';
+  inp.required = tipo === 'invitados';
+  if (tipo !== 'invitados') inp.value = '';
+}
+document.getElementById('modal-cua').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModal();
+});
+
+// ── TOGGLE ÚLTIMA CUADRILLA ───────────────
+function toggleUltima(prefix, checked) {
+  document.getElementById(`${prefix}-campo-deja`).style.display = checked ? 'block' : 'none';
+  const inp = document.getElementById(`${prefix}-punto-deja`);
+  if (inp) inp.required = checked;
+}
+
+// ── MODAL EDITAR ──────────────────────────
+function abrirEditar(btn) {
+  const c = CUADRILLAS_DATA.find(x => x.id === btn.dataset.id);
+  if (!c) return;
+  const form = document.getElementById('form-edit-cua');
+  form.action = `/cuadrillas/editar/${c.id}`;
+  document.getElementById('edit-recorrido').value  = c.recorrido_id || '';
+  document.getElementById('edit-numero').value     = c.numero;
+  document.getElementById('edit-cuadrilla').value  = c.cuadrilla || '';
+  document.getElementById('edit-tipo').value       = c.tipo || 'regular';
+  document.getElementById('edit-ubicacion').value  = c.ubicacion || '';
+  document.getElementById('edit-metraje').value    = c.metraje;
+  document.getElementById('edit-tiempo').value     = c.tiempo_estimado;
+  document.getElementById('edit-hora-toma').value  = c.hora_toma || '';
+  document.getElementById('edit-hora-deja').value  = c.hora_deja || '';
+  onEditTipoChange(c.tipo || 'regular');
+  if (c.tipo === 'invitados') document.getElementById('edit-hermandad').value = c.hermandad_invitada || '';
+
+  // Cargar es_ultima / punto_deja
+  const esUltimaChk = document.getElementById('edit-es-ultima');
+  esUltimaChk.checked = !!c.es_ultima;
+  toggleUltima('edit', !!c.es_ultima);
+  document.getElementById('edit-punto-deja').value = c.punto_deja || '';
+
+  // Cargar coordenadas
+  if (c.lat && c.lng) {
+    document.getElementById('edit-lat').value = c.lat;
+    document.getElementById('edit-lng').value = c.lng;
+    actualizarDisplayCoords('edit', c.lat, c.lng);
+  } else {
+    document.getElementById('edit-lat').value = '';
+    document.getElementById('edit-lng').value = '';
+    actualizarDisplayCoords('edit', null, null);
+  }
+  document.getElementById('modal-edit-cua').classList.add('open');
+}
+function onEditCuadrillaChange(val) {
+  const sel = document.getElementById('edit-tipo');
+  if (val === 'Hermanos Honorarios') sel.value = 'honorarios';
+  else if (val === 'Invitados')       sel.value = 'invitados';
+  else                                sel.value = 'regular';
+  onEditTipoChange(sel.value);
+}
+function onEditTipoChange(tipo) {
+  const campo = document.getElementById('edit-campo-invitada');
+  const inp   = document.getElementById('edit-hermandad');
+  campo.style.display = tipo === 'invitados' ? 'block' : 'none';
+  inp.required = tipo === 'invitados';
+  if (tipo !== 'invitados') inp.value = '';
+}
+function cerrarModalEdit() {
+  document.getElementById('modal-edit-cua').classList.remove('open');
+}
+document.getElementById('modal-edit-cua').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModalEdit();
+});
+
+// ── MAPA PICKER ───────────────────────────
+let pickerTarget     = null;
+let pickerMap        = null;
+let pickerMarker     = null;
+let pickerRouteLayer = null;
+let pickerLat        = null;
+let pickerLng        = null;
+
+function abrirPicker(target) {
+  pickerTarget = target;
+  pickerLat = null;
+  pickerLng = null;
+  document.getElementById('picker-coords').textContent = 'Haz clic en el mapa…';
+  document.getElementById('picker-pin').style.color = '#ccc';
+  document.getElementById('modal-picker').classList.add('open');
+
+  setTimeout(() => {
+    if (!pickerMap) {
+      pickerMap = L.map('mapa-picker').setView([-12.0474, -77.0390], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19
+      }).addTo(pickerMap);
+      pickerMap.on('click', function(e) {
+        pickerLat = e.latlng.lat.toFixed(6);
+        pickerLng = e.latlng.lng.toFixed(6);
+        if (pickerMarker) pickerMap.removeLayer(pickerMarker);
+        pickerMarker = L.marker([pickerLat, pickerLng]).addTo(pickerMap);
+        document.getElementById('picker-coords').textContent = `${pickerLat}, ${pickerLng}`;
+        document.getElementById('picker-pin').style.color = 'var(--verde)';
+      });
+    }
+    pickerMap.invalidateSize();
+
+    // Dibujar ruta del recorrido seleccionado como guía
+    const ridEl = document.getElementById(target === 'new' ? 'new-recorrido' : 'edit-recorrido');
+    const rid = ridEl?.value;
+    if (pickerRouteLayer) { pickerMap.removeLayer(pickerRouteLayer); pickerRouteLayer = null; }
+    if (rid && RUTAS[rid] && RUTAS[rid].length > 1) {
+      pickerRouteLayer = L.polyline(RUTAS[rid], {
+        color: '#6E1E91', weight: 5, opacity: 0.5, dashArray: '9, 6'
+      }).addTo(pickerMap);
+      pickerMap.fitBounds(pickerRouteLayer.getBounds(), { padding: [30, 30] });
+    }
+
+    // Si ya tiene coords, mostrarlas y centrar
+    const latEl = document.getElementById(target === 'new' ? 'new-lat' : 'edit-lat');
+    const lngEl = document.getElementById(target === 'new' ? 'new-lng' : 'edit-lng');
+    if (latEl.value && lngEl.value) {
+      pickerLat = latEl.value;
+      pickerLng = lngEl.value;
+      if (pickerMarker) pickerMap.removeLayer(pickerMarker);
+      pickerMarker = L.marker([pickerLat, pickerLng]).addTo(pickerMap);
+      pickerMap.setView([pickerLat, pickerLng], 17);
+      document.getElementById('picker-coords').textContent = `${pickerLat}, ${pickerLng}`;
+      document.getElementById('picker-pin').style.color = 'var(--verde)';
+    }
+  }, 100);
+}
+
+function confirmarUbicacion() {
+  if (!pickerLat || !pickerLng) {
+    alert('Haz clic en el mapa para seleccionar un punto.');
+    return;
+  }
+  document.getElementById(`${pickerTarget}-lat`).value = pickerLat;
+  document.getElementById(`${pickerTarget}-lng`).value = pickerLng;
+  actualizarDisplayCoords(pickerTarget, pickerLat, pickerLng);
+  cerrarPicker();
+}
+
+function actualizarDisplayCoords(prefix, lat, lng) {
+  const display = document.getElementById(`${prefix}-coords-display`);
+  const pin     = document.getElementById(`${prefix}-pin-icon`);
+  if (lat && lng) {
+    display.textContent = `📍 ${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}`;
+    display.style.color = 'var(--verde)';
+    if (pin) pin.style.color = 'var(--verde)';
+  } else {
+    display.textContent = 'Sin punto seleccionado — haz clic en "Fijar en mapa"';
+    display.style.color = 'var(--gris-text)';
+    if (pin) pin.style.color = '#ccc';
+  }
+}
+
+function cerrarPicker() {
+  document.getElementById('modal-picker').classList.remove('open');
+}
+document.getElementById('modal-picker').addEventListener('click', function(e) {
+  if (e.target === this) cerrarPicker();
+});
+</script>
+{% endblock %}

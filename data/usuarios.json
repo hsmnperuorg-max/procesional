@@ -1,0 +1,23 @@
+[
+  {
+    "id": "usr-001",
+    "nombre": "Administrador General",
+    "usuario": "admin",
+    "password": "admin123",
+    "rol": "Administrador General"
+  },
+  {
+    "id": "usr-002",
+    "nombre": "Juan Ríos",
+    "usuario": "cronometro1",
+    "password": "cron123",
+    "rol": "Cronometrista"
+  },
+  {
+    "id": "usr-003",
+    "nombre": "Carlos Mendoza",
+    "usuario": "director",
+    "password": "dir123",
+    "rol": "Director de Recorrido"
+  }
+]

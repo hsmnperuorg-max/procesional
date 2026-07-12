@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Ejecutivo{% endblock %}
+{% block content %}
+
+{% set rec = recorrido_actual %}
+
+<!-- Cabecera + Selector compacto -->
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px">
+  <div>
+    <h1 style="font-size:22px;font-weight:700;color:var(--morado-oscuro)">
+      <i class="fa fa-gauge" style="color:var(--morado)"></i> Centro de Control Operacional
+    </h1>
+  </div>
+
+  <i class="fa fa-route" style="color:var(--morado);font-size:16px"></i>
+  <select onchange="window.location='/dashboard?rid='+this.value"
+          style="padding:8px 16px;border-radius:8px;border:2px solid var(--morado);
+                 font-size:13px;color:var(--morado-oscuro);background:white;
+                 cursor:pointer;min-width:280px;max-width:400px">
+    {% for r in recorridos %}
+    {% if r.fecha == hoy %}{% set ico = '🟢' %}
+    {% elif r.fecha < hoy %}{% set ico = '📋' %}
+    {% else %}{% set ico = '📅' %}{% endif %}
+    <option value="{{ r.id }}" {% if r.id == rid %}selected{% endif %}>
+      {{ ico }} {{ r.nombre }} · {{ r.fecha }}
+    </option>
+    {% endfor %}
+  </select>
+
+  {% if rec and rec.fecha == hoy %}
+    <span style="background:#e8f8ef;color:#1a7a3f;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap">
+      <span class="status-dot dot-verde" style="margin-right:3px"></span>EN VIVO
+    </span>
+  {% elif rec and rec.fecha < hoy %}
+    <span style="background:#f0f0f0;color:#666;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap">
+      <i class="fa fa-archive"></i> HISTÓRICO · {{ rec.fecha }}
+    </span>
+  {% else %}
+    <span style="background:#e8f0ff;color:#2056c0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap">
+      <i class="fa fa-calendar-check"></i> PRÓXIMO
+    </span>
+  {% endif %}
+
+  <div style="flex:1"></div>
+  <span id="reloj" style="font-size:22px;font-weight:700;color:var(--morado-oscuro);font-variant-numeric:tabular-nums;white-space:nowrap"></span>
+  <button class="btn btn-outline btn-sm" onclick="resetDemo()"><i class="fa fa-rotate-left"></i> Reset Demo</button>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid" id="kpi-grid">
+  <div class="kpi-card morado">
+    <div class="kpi-label">Cuadrilla Activa</div>
+    <div class="kpi-value" id="kpi-cuadrilla">–</div>
+    <div class="kpi-sub" id="kpi-cuadrilla-nombre">Sin iniciar</div>
+  </div>
+  <div class="kpi-card dorado">
+    <div class="kpi-label">Metros Recorridos</div>
+    <div class="kpi-value" id="kpi-metros">0</div>
+    <div class="kpi-sub" id="kpi-metros-pct">de 0 m · 0%</div>
+  </div>
+  <div class="kpi-card verde" id="kpi-tiempo-card">
+    <div class="kpi-label">Estado de Tiempo</div>
+    <div class="kpi-value" id="kpi-atraso">—</div>
+    <div class="kpi-sub">adelanto / atraso</div>
+  </div>
+  <div class="kpi-card azul">
+    <div class="kpi-label">ETA Llegada</div>
+    <div class="kpi-value" id="kpi-eta">{{ rec.hora_llegada_programada if rec else '–' }}</div>
+    <div class="kpi-sub" id="kpi-eta-sub">Hora programada: {{ rec.hora_llegada_programada if rec else '–' }}</div>
+  </div>
+  <div class="kpi-card naranja">
+    <div class="kpi-label">Cuadrillas Completas</div>
+    <div class="kpi-value" id="kpi-completadas">0 / {{ cuadrillas|length }}</div>
+    <div class="kpi-sub" id="kpi-pct-avance">0% completado</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">Total Eventos</div>
+    <div class="kpi-value" id="kpi-eventos">0</div>
+    <div class="kpi-sub">registros operativos</div>
+  </div>
+</div>
+
+<!-- Barra de progreso -->
+<div class="card" style="padding:18px 24px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:13px;font-weight:600;color:var(--morado-oscuro)"><i class="fa fa-person-walking"></i> Avance del Recorrido</span>
+    <span id="pct-label" style="font-size:13px;font-weight:700;color:var(--morado)">0%</span>
+  </div>
+  <div style="position:relative;padding-bottom:28px">
+    <div style="background:var(--gris);border-radius:100px;height:10px;overflow:hidden">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <img id="senor-progress" src="/static/img/senor.png"
+         style="position:absolute;bottom:0;left:0%;transform:translateX(-50%);
+                height:40px;object-fit:contain;
+                filter:drop-shadow(0 2px 8px rgba(75,20,98,0.7));
+                transition:left 0.5s ease;pointer-events:none;z-index:2"
+         onerror="this.style.display='none'">
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gris-text)">
+    <span>Nazarenas</span><span>Jr. de la Unión</span><span>Plaza de Armas</span><span>Penitenciaría</span><span>Nazarenas</span>
+  </div>
+</div>
+
+<!-- Dos columnas: Cuadrillas + Log de eventos -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+  <!-- TABLA CUADRILLAS -->
+  <div class="card">
+    <div class="card-header">
+      <h2><i class="fa fa-people-group"></i> Cuadrillas – Tiempos</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Cuadrilla</th><th>Prog.</th><th>Real</th><th>Dif.</th><th>Estado</th></tr>
+        </thead>
+        <tbody id="tabla-cuadrillas">
+          {% for c in cuadrillas %}
+          <tr id="row-{{ c.id }}">
+            <td><strong>{{ c.numero }}</strong></td>
+            <td style="font-size:12px">{{ c.cuadrilla | truncate(26) }}</td>
+            <td>{{ c.tiempo_estimado }}m</td>
+            <td id="real-{{ c.id }}">–</td>
+            <td id="dif-{{ c.id }}">–</td>
+            <td id="est-{{ c.id }}"><span class="badge badge-gris">Pendiente</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LOG DE EVENTOS -->
+  <div class="card">
+    <div class="card-header">
+      <h2><i class="fa fa-list-check"></i> Registro de Eventos</h2>
+      <span id="dot-live">
+        {% if rec and rec.fecha == hoy %}
+          <span class="status-dot dot-verde"></span><span style="font-size:12px;color:var(--verde)">En vivo</span>
+        {% else %}
+          <span style="font-size:12px;color:#999"><i class="fa fa-archive"></i> Histórico</span>
+        {% endif %}
+      </span>
+    </div>
+    <div id="log-eventos" style="max-height:340px;overflow-y:auto">
+      <div style="text-align:center;color:var(--gris-text);padding:40px;font-size:14px">
+        <i class="fa fa-clock" style="font-size:36px;color:var(--gris);display:block;margin-bottom:12px"></i>
+        {% if rec and rec.fecha == hoy %}
+          Esperando registro de eventos desde la tablet de campo...
+        {% else %}
+          Cargando eventos del recorrido...
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLA HOMENAJES -->
+<div class="card" style="margin-top:0">
+  <div class="card-header">
+    <h2><i class="fa fa-church" style="color:var(--dorado)"></i> Homenajes – Tiempos</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Homenaje</th><th>Ubicación</th><th>Prog.</th><th>Real</th><th>Dif.</th><th>Estado</th></tr>
+      </thead>
+      <tbody id="tabla-homenajes">
+        {% for h in homenajes %}
+        <tr id="hrow-{{ h.id }}">
+          <td style="font-size:12px;font-weight:600">{{ h.nombre | truncate(40) }}</td>
+          <td style="font-size:11px;color:var(--gris-text)">{{ h.ubicacion or '–' }}</td>
+          <td>{{ h.tiempo_programado }}m</td>
+          <td id="hreal-{{ h.id }}">–</td>
+          <td id="hdif-{{ h.id }}">–</td>
+          <td id="hest-{{ h.id }}"><span class="badge badge-gris">Pendiente</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#ccc;padding:20px;font-size:13px">Sin homenajes registrados para este recorrido</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Alertas operativas -->
+<div id="panel-alertas" style="display:none" class="card">
+  <div class="card-header">
+    <h2 style="color:var(--rojo)"><i class="fa fa-triangle-exclamation"></i> Alertas Operativas</h2>
+  </div>
+  <div id="lista-alertas"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const RID = '{{ rid }}';
+
+// Reloj
+function actualizarReloj() {
+  document.getElementById('reloj').textContent =
+    new Date().toLocaleTimeString('es-PE', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(actualizarReloj, 1000);
+actualizarReloj();
+
+// Tipos legibles
+const TIPOS = {
+  inicio_cuadrilla: '▶ Inicio cuadrilla',
+  fin_cuadrilla:    '⏹ Fin cuadrilla',
+  inicio_homenaje:  '🙏 Inicio homenaje',
+  fin_homenaje:     '✓ Fin homenaje',
+  inicio_cambio:    '🔄 Inicio cambio',
+  fin_cambio:       '✓ Fin cambio',
+  inicio_sector:    '📍 Inicio sector',
+  fin_sector:       '🏁 Fin sector',
+  observacion:      '📝 Observación',
+};
+
+const CUADRILLAS = {};
+{% for c in cuadrillas %}
+  CUADRILLAS['{{ c.id }}'] = { numero: {{ c.numero }}, nombre: '{{ c.cuadrilla | replace("'", "\\'") }}', estimado: {{ c.tiempo_estimado }} };
+{% endfor %}
+
+const HOMENAJES = {};
+{% for h in homenajes %}
+  HOMENAJES['{{ h.id }}'] = { nombre: '{{ h.nombre | replace("'", "\\'") }}', estimado: {{ h.tiempo_programado }} };
+{% endfor %}
+
+// Polling cada 3 segundos
+async function actualizarDashboard() {
+  try {
+    const [estado, eventos] = await Promise.all([
+      fetch(`/api/estado?rid=${RID}`).then(r => r.json()),
+      fetch(`/api/eventos_recientes?rid=${RID}`).then(r => r.json()),
+    ]);
+
+    // KPIs
+    const nCua = estado.cuadrilla_activa ? estado.cuadrilla_activa.numero : '–';
+    document.getElementById('kpi-cuadrilla').textContent = nCua !== '–' ? '#' + nCua : '–';
+    document.getElementById('kpi-cuadrilla-nombre').textContent =
+      estado.cuadrilla_activa ? (estado.cuadrilla_activa.cuadrilla || estado.cuadrilla_activa.nombre || '') : 'Sin cuadrilla activa';
+
+    document.getElementById('kpi-metros').textContent = estado.metros_recorridos.toLocaleString();
+    document.getElementById('kpi-metros-pct').textContent = `de ${estado.metros_totales.toLocaleString()} m · ${estado.porcentaje}%`;
+
+    const atrMin = estado.atraso_minutos;
+    const kpiTiempo = document.getElementById('kpi-atraso');
+    const kpiCard = document.getElementById('kpi-tiempo-card');
+    if (atrMin > 0) {
+      kpiTiempo.textContent = `+${atrMin} min`;
+      kpiCard.className = 'kpi-card rojo';
+    } else if (atrMin < 0) {
+      kpiTiempo.textContent = `${atrMin} min`;
+      kpiCard.className = 'kpi-card verde';
+    } else {
+      kpiTiempo.textContent = 'A tiempo';
+      kpiCard.className = 'kpi-card verde';
+    }
+
+    document.getElementById('kpi-eta').textContent = estado.eta;
+    document.getElementById('kpi-eta-sub').textContent = `Hora programada: ${estado.hora_llegada_prog || '–'}`;
+    document.getElementById('kpi-completadas').textContent = `${estado.cuadrillas_completadas} / ${estado.total_cuadrillas}`;
+    document.getElementById('kpi-pct-avance').textContent = `${estado.porcentaje}% completado`;
+    document.getElementById('kpi-eventos').textContent = estado.total_eventos;
+
+    // Progreso
+    const pct = estado.porcentaje;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('pct-label').textContent = pct + '%';
+    const senorEl = document.getElementById('senor-progress');
+    if (senorEl) senorEl.style.left = pct + '%';
+
+    // Tabla cuadrillas
+    estado.tiempos_cuadrilla.forEach(t => {
+      const cua = Object.entries(CUADRILLAS).find(([,v]) => v.numero === t.numero);
+      if (!cua) return;
+      const id = cua[0];
+      const realEl = document.getElementById(`real-${id}`);
+      const difEl  = document.getElementById(`dif-${id}`);
+      const estEl  = document.getElementById(`est-${id}`);
+      if (realEl) realEl.textContent = t.real + 'm';
+      if (difEl) {
+        difEl.textContent = (t.diferencia > 0 ? '+' : '') + t.diferencia + 'm';
+        difEl.style.color = t.diferencia > 5 ? 'var(--rojo)' : t.diferencia < -2 ? 'var(--verde)' : '#333';
+      }
+      if (estEl) {
+        const atrasado = t.diferencia > 0;
+        estEl.innerHTML = `<span class="badge ${atrasado ? 'badge-rojo' : 'badge-verde'}">${atrasado ? 'Atrasado' : 'A tiempo'}</span>`;
+      }
+    });
+
+    // Tabla homenajes
+    if (estado.tiempos_homenaje) {
+      estado.tiempos_homenaje.forEach(t => {
+        const realEl = document.getElementById(`hreal-${t.id}`);
+        const difEl  = document.getElementById(`hdif-${t.id}`);
+        const estEl  = document.getElementById(`hest-${t.id}`);
+        if (realEl) realEl.textContent = t.real + 'm';
+        if (difEl) {
+          difEl.textContent = (t.diferencia > 0 ? '+' : '') + t.diferencia + 'm';
+          difEl.style.color = t.diferencia > 0 ? 'var(--rojo)' : 'var(--verde)';
+        }
+        if (estEl) {
+          const atrasado = t.diferencia > 0;
+          estEl.innerHTML = `<span class="badge ${atrasado ? 'badge-rojo' : 'badge-verde'}">${atrasado ? 'Atrasado' : 'A tiempo'}</span>`;
+        }
+      });
+    }
+
+    // Homenaje activo en tabla
+    if (estado.homenaje_activo) {
+      const id = estado.homenaje_activo.id;
+      const estEl = document.getElementById(`hest-${id}`);
+      if (estEl) estEl.innerHTML = `<span class="badge badge-morado"><span class="status-dot dot-verde"></span>Activo</span>`;
+    }
+
+    // Cuadrilla activa en tabla
+    if (estado.cuadrilla_activa) {
+      const id = estado.cuadrilla_activa.id;
+      const estEl = document.getElementById(`est-${id}`);
+      if (estEl) estEl.innerHTML = `<span class="badge badge-morado"><span class="status-dot dot-verde"></span>Activa</span>`;
+    }
+
+    // Log eventos
+    const logDiv = document.getElementById('log-eventos');
+    if (eventos.length > 0) {
+      logDiv.innerHTML = eventos.slice().reverse().map(e => `
+        <div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid #f0f0f0;align-items:flex-start">
+          <span style="font-size:11px;color:var(--morado);font-weight:600;white-space:nowrap">${e.fecha_hora.split(' ')[1].substr(0,5)}</span>
+          <div>
+            <div style="font-size:13px;font-weight:600">${TIPOS[e.tipo] || e.tipo}</div>
+            <div style="font-size:11px;color:var(--gris-text)">${e.usuario} ${e.observacion ? '· ' + e.observacion : ''}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Alertas
+    const alertas = [];
+    if (atrMin > 15) alertas.push({ tipo: 'rojo', msg: `⚠️ Atraso acumulado de ${atrMin} minutos. ETA proyectada: ${estado.eta}` });
+    if (estado.cuadrillas_completadas === estado.total_cuadrillas && estado.total_cuadrillas > 0)
+      alertas.push({ tipo: 'verde', msg: '✅ Recorrido completado exitosamente.' });
+
+    const panel = document.getElementById('panel-alertas');
+    const lista = document.getElementById('lista-alertas');
+    if (alertas.length > 0) {
+      panel.style.display = 'block';
+      lista.innerHTML = alertas.map(a => `<div class="alert alert-${a.tipo === 'rojo' ? 'error' : 'success'}">${a.msg}</div>`).join('');
+    } else {
+      panel.style.display = 'none';
+    }
+
+  } catch(e) { console.error(e); }
+}
+
+actualizarDashboard();
+setInterval(actualizarDashboard, 3000);
+
+async function resetDemo() {
+  if (!confirm('¿Reiniciar todos los eventos de demostración?')) return;
+  await fetch('/api/reset', { method: 'POST' });
+  actualizarDashboard();
+}
+</script>
+{% endblock %}

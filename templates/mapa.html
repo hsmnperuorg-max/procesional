@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Mapa del Recorrido{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fa fa-map-location-dot" style="color:var(--morado)"></i> Seguimiento en Tiempo Real</h1>
+    <p id="sub-nombre">{{ recorrido.nombre if recorrido else '–' }}</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <select id="sel-recorrido" onchange="cambiarRecorrido(this.value)"
+            style="padding:8px 14px;border-radius:7px;border:1.5px solid var(--morado);font-size:13px;color:var(--morado-oscuro)">
+      {% for r in recorridos %}
+      <option value="{{ r.id }}" {% if recorrido and r.id == recorrido.id %}selected{% endif %}>{{ r.nombre }}</option>
+      {% endfor %}
+    </select>
+    <span id="dot-live"><span class="status-dot dot-verde"></span><span style="font-size:12px;color:var(--verde)">En vivo</span></span>
+  </div>
+</div>
+
+<!-- Barra de progreso -->
+<div class="card" style="padding:16px 24px;margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div>
+      <span style="font-size:13px;font-weight:600;color:var(--morado-oscuro)">
+        <i class="fa fa-person-walking" style="color:var(--morado)"></i> Posición actual:
+      </span>
+      <span id="wp-nombre" style="font-size:14px;font-weight:700;color:var(--morado);margin-left:8px">—</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span id="wp-pct" style="font-size:22px;font-weight:700;color:var(--morado)">0%</span>
+      <span id="wp-count" style="font-size:13px;color:var(--gris-text)">– / –</span>
+    </div>
+  </div>
+  <div style="position:relative;padding-bottom:26px">
+    <div style="background:var(--gris);border-radius:100px;height:10px;overflow:hidden">
+      <div class="progress-fill" id="mapa-progress" style="width:0%"></div>
+    </div>
+    <img id="senor-mapa-bar" src="/static/img/senor.png"
+         style="position:absolute;bottom:0;left:0%;transform:translateX(-50%);
+                height:36px;object-fit:contain;
+                filter:drop-shadow(0 2px 8px rgba(75,20,98,0.7));
+                transition:left 0.5s ease;pointer-events:none;z-index:2"
+         onerror="this.style.display='none'">
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gris-text);margin-top:4px">
+    <span id="lbl-inicio">—</span>
+    <span id="lbl-fin">—</span>
+  </div>
+</div>
+
+<!-- Mapa + checkpoints -->
+<div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
+
+  <!-- Mapa -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <div id="map" style="height:560px"></div>
+    <div style="display:flex;gap:20px;padding:10px 16px;background:#fafafa;border-top:1px solid var(--gris);font-size:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:28px;height:4px;border:2px dashed #D4AF37;border-radius:2px"></div>
+        <span style="color:var(--gris-text)">Ruta pendiente</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:28px;height:6px;background:var(--morado);border-radius:3px"></div>
+        <span style="color:var(--gris-text)">Ruta recorrida</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:14px;height:14px;background:#D4AF37;border:2px solid var(--morado-oscuro);border-radius:50%"></div>
+        <span style="color:var(--gris-text)">Cuadrilla activa</span>
+      </div>
+      <div style="flex:1;text-align:right">
+        <span style="font-size:11px;color:var(--gris-text)">
+          <i class="fa fa-people-group" style="color:var(--morado)"></i>
+          La ruta se actualiza automáticamente al registrar cambios de cuadrilla en la tablet
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel de cuadrillas -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+
+    <!-- Info cuadrilla activa -->
+    <div class="card" id="card-activa" style="padding:16px;display:none">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gris-text);margin-bottom:6px">
+        <span class="status-dot dot-verde"></span> Cuadrilla en curso
+      </div>
+      <div id="activa-nombre" style="font-size:16px;font-weight:700;color:var(--morado-oscuro)">—</div>
+    </div>
+
+    <!-- Aviso sin ruta trazada -->
+    <div class="card" id="card-sin-ruta" style="padding:16px;display:none;border-left:4px solid var(--naranja)">
+      <div style="font-size:13px;color:var(--naranja);font-weight:600"><i class="fa fa-triangle-exclamation"></i> Sin ruta trazada</div>
+      <div style="font-size:12px;color:var(--gris-text);margin-top:4px">
+        Este recorrido no tiene ruta trazada aún.<br>
+        Ve a <a href="/recorridos" style="color:var(--morado)">Recorridos</a> y usa <strong>Trazar ruta</strong>.
+      </div>
+    </div>
+    <!-- Aviso sin puntos de relevo -->
+    <div class="card" id="card-sin-puntos" style="padding:16px;display:none;border-left:4px solid #bbb">
+      <div style="font-size:13px;color:#888;font-weight:600"><i class="fa fa-map-pin"></i> Sin puntos de relevo</div>
+      <div style="font-size:12px;color:var(--gris-text);margin-top:4px">
+        Ninguna cuadrilla tiene punto fijado en mapa.<br>
+        Ve a <a href="/cuadrillas" style="color:var(--morado)">Cuadrillas</a> y usa "Fijar en mapa" en cada una.
+      </div>
+    </div>
+
+    <!-- Lista de cuadrillas con estado -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:12px 16px;background:var(--morado-oscuro)">
+        <div style="font-size:13px;font-weight:600;color:white"><i class="fa fa-list-check"></i> Cuadrillas del Recorrido</div>
+      </div>
+      <div id="lista-checkpoints" style="overflow-y:auto;max-height:460px">
+        <div style="padding:20px;text-align:center;color:var(--gris-text);font-size:13px">Cargando…</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  #map { z-index: 1; }
+  .cp-item { display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f0f0f0; }
+  .cp-item.activo { background:rgba(110,30,145,0.09); }
+  .cp-num {
+    width:26px;height:26px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+  }
+  .cp-num.hecho    { background:var(--morado);color:white; }
+  .cp-num.activo   { background:var(--dorado);color:var(--morado-deep); }
+  .cp-num.pendiente{ background:#e0e0e0;color:#999; }
+</style>
+<script>
+let RID = '{{ recorrido.id if recorrido else "rec-001" }}';
+let map, allLayers = [], lastWP = -99;
+
+map = L.map('map').setView([-12.0474, -77.0390], 15);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>', maxZoom: 19
+}).addTo(map);
+
+function clearLayers() {
+  allLayers.forEach(l => { try { map.removeLayer(l); } catch(e){} });
+  allLayers = [];
+}
+
+async function actualizarMapa() {
+  try {
+    const resp = await fetch(`/api/posicion_mapa?rid=${RID}`);
+    const data = await resp.json();
+
+    const ruta        = data.ruta_coords || [];
+    const fillIndex   = data.fill_index  ?? 0;
+    const total       = data.total       || 0;
+    const nComp       = data.n_completadas ?? 0;
+    const activaId    = data.activa_id;
+    const activaNombre= data.activa_nombre;
+    const segments    = data.segments || [];
+    const tieneRuta   = data.tiene_ruta;
+    const conPunto    = segments.filter(s => s.lat).length;
+
+    // Avisos de estado
+    document.getElementById('card-sin-ruta').style.display    = !tieneRuta ? 'block' : 'none';
+    document.getElementById('card-sin-puntos').style.display  = (tieneRuta && conPunto === 0) ? 'block' : 'none';
+
+    // Sin cambio → no redibujar
+    const clave = `${fillIndex}-${ruta.length}-${activaId}-${nComp}`;
+    if (clave === lastWP) return;
+    const primeraCarga = lastWP === -99;
+    lastWP = clave;
+
+    clearLayers();
+
+    if (tieneRuta && ruta.length > 1) {
+      // Ruta completa (dorado punteado)
+      const fullLine = L.polyline(ruta, {
+        color: '#D4AF37', weight: 5, opacity: 0.45, dashArray: '10, 6'
+      }).addTo(map);
+      allLayers.push(fullLine);
+
+      // Tramo recorrido (morado sólido) — sigue exactamente las calles dibujadas
+      if (fillIndex > 0) {
+        const doneLine = L.polyline(ruta.slice(0, fillIndex + 1), {
+          color: '#6E1E91', weight: 8, opacity: 0.95, lineJoin: 'round', lineCap: 'round'
+        }).addTo(map);
+        allLayers.push(doneLine);
+
+        // Marcador en la punta del avance — ícono del Señor
+        const posPt = ruta[fillIndex];
+        const iconSenor = L.divIcon({
+          html: `<img src="/static/img/senor.png"
+                      style="width:46px;height:58px;object-fit:contain;
+                             filter:drop-shadow(0 3px 10px rgba(75,20,98,0.8));"
+                      onerror="this.parentElement.innerHTML='<div style=width:22px;height:22px;background:%23D4AF37;border:3px solid %234B1462;border-radius:50%></div>'">`,
+          iconSize: [46, 58],
+          iconAnchor: [23, 58],
+          className: ''
+        });
+        const posMarker = L.marker(posPt, { icon: iconSenor })
+          .bindTooltip(activaNombre ? `<b>${activaNombre}</b>` : 'Posición actual', { permanent: false })
+          .addTo(map);
+        allLayers.push(posMarker);
+      }
+
+      if (primeraCarga) map.fitBounds(L.latLngBounds(ruta), { padding: [30, 30] });
+    }
+
+    // Marcadores de cuadrillas (puntos de relevo) — solo las que tienen lat/lng
+    segments.filter(s => s.lat && s.lng).forEach(s => {
+      const esActiva = s.id === activaId;
+      const cm = L.circleMarker([s.lat, s.lng], {
+        radius:      esActiva ? 11 : 7,
+        fillColor:   esActiva ? '#D4AF37' : s.completada ? '#6E1E91' : '#ccc',
+        color:       esActiva ? '#4B1462' : s.completada ? '#4B1462' : '#aaa',
+        weight:      esActiva ? 3 : 1.5,
+        fillOpacity: 1,
+      }).bindTooltip(`<strong>${s.numero}. ${s.nombre}</strong>`, { direction: 'top' }).addTo(map);
+      allLayers.push(cm);
+    });
+
+    // UI – progreso
+    const pct = total > 0 ? Math.round(nComp / total * 100) : 0;
+    document.getElementById('mapa-progress').style.width = pct + '%';
+    const barIcon = document.getElementById('senor-mapa-bar');
+    if (barIcon) barIcon.style.left = pct + '%';
+    document.getElementById('wp-pct').textContent    = pct + '%';
+    document.getElementById('wp-count').textContent  = `${nComp} / ${total} cuadrillas`;
+    document.getElementById('wp-nombre').textContent = activaNombre ?? (nComp === total && total > 0 ? '¡Recorrido completado!' : 'Esperando inicio…');
+    document.getElementById('lbl-inicio').textContent = 'Inicio del recorrido';
+    document.getElementById('lbl-fin').textContent    = 'Llegada';
+
+    // Card cuadrilla activa
+    const cardActiva = document.getElementById('card-activa');
+    if (activaNombre) {
+      document.getElementById('activa-nombre').textContent = activaNombre;
+      cardActiva.style.display = 'block';
+    } else {
+      cardActiva.style.display = 'none';
+    }
+
+    // Lista completa de cuadrillas (todas, con o sin punto en mapa)
+    const lista = document.getElementById('lista-checkpoints');
+    if (segments.length === 0) {
+      lista.innerHTML = '<div style="padding:16px;text-align:center;color:#ccc;font-size:13px">Sin cuadrillas registradas</div>';
+      return;
+    }
+    lista.innerHTML = segments.map(s => `
+      <div class="cp-item ${s.activa ? 'activo' : ''}">
+        <div class="cp-num ${s.completada ? 'hecho' : s.activa ? 'activo' : 'pendiente'}">
+          ${s.completada ? '<i class="fa fa-check" style="font-size:10px"></i>' : s.numero}
+        </div>
+        <div style="font-size:12px;line-height:1.4;
+          color:${s.activa ? 'var(--morado-oscuro)' : s.completada ? '#888' : '#bbb'};
+          font-weight:${s.activa ? '600' : '400'}">
+          ${s.nombre}
+          ${!s.lat ? '<br><span style="font-size:10px;color:#ddd;font-style:italic">Sin punto en mapa</span>' : ''}
+        </div>
+        ${s.activa ? '<span class="status-dot dot-verde" style="margin-left:auto;flex-shrink:0"></span>' : ''}
+      </div>
+    `).join('');
+
+    const activeEl = lista.querySelector('.cp-item.activo');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  } catch(e) { console.error(e); }
+}
+
+function cambiarRecorrido(rid) {
+  RID = rid;
+  lastWP = -99;
+  lastTotal = 0;
+  clearLayers();
+  actualizarMapa();
+}
+
+actualizarMapa();
+setInterval(actualizarMapa, 3000);
+</script>
+{% endblock %}

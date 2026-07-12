@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Toma y Deja – {{ recorrido.nombre }}{% endblock %}
+
+{% block content %}
+<style>
+@media print {
+  nav, .sidebar, .btn-herramientas, .page-header .btn { display: none !important; }
+  body { background: white !important; margin: 0; font-size: 11px; }
+  .main-content, .content-wrap, main { padding: 0 !important; margin: 0 !important; }
+  .card { box-shadow: none !important; border: none !important; margin: 0 !important; }
+  .rep-wrap { padding: 0; }
+  .mapa-section { page-break-before: always; }
+  .leaflet-container { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 1cm; size: A4 portrait; }
+}
+
+.rep-wrap * { box-sizing: border-box; }
+.rep-header { background: #4B1462; color: white; padding: 10px 16px; }
+.rep-sub    { background: #6E1E91; color: white; text-align: center; font-size: 18px; font-weight: 900; letter-spacing: 2px; padding: 5px; }
+
+.tyd-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.tyd-table thead th {
+  background: #4B1462; color: white;
+  padding: 6px 8px; border: 1px solid #4B1462;
+  font-size: 10.5px; text-transform: uppercase;
+}
+.tyd-table td { border: 1px solid #c9b8d9; padding: 4px 7px; vertical-align: middle; }
+
+.row-toma { background: #f8f3ff; }
+.row-deja { background: #ffffff; }
+.row-toma:hover, .row-deja:hover { background: #ede0f8; }
+
+.cua-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #4B1462; color: white; font-weight: 900; font-size: 13px;
+  flex-shrink: 0;
+}
+.hora-cell { font-weight: 700; color: #333; text-align: center; white-space: nowrap; font-size: 11px; }
+.toma-lbl  { font-weight: 700; color: #1a6e1a; }
+.deja-lbl  { font-weight: 700; color: #6e1a1a; }
+.metraje-cell {
+  text-align: center; font-weight: 700; font-size: 12.5px; color: #4B1462;
+  border-left: 2px solid #6E1E91; letter-spacing: 0.3px;
+}
+.tiempo-cell { text-align: center; font-size: 10px; color: #555; white-space: nowrap; }
+.hom-obs { font-size: 10px; font-weight: 700; color: #4B1462; text-align: center; line-height: 1.3; }
+
+.leyenda-box { border: 1px solid #4B1462; border-radius: 4px; overflow: hidden; margin-top: 14px; }
+.leyenda-box .head { background: #4B1462; color: white; font-weight: 700; text-align: center; padding: 5px; font-size: 12px; }
+.leyenda-box .body { padding: 6px 16px; font-size: 11px; text-align: center; line-height: 2.1; }
+
+.hom-section-head { background: #6E1E91; color: white; font-weight: 700; padding: 7px 14px; font-size: 12px; margin-top: 18px; border-radius: 4px 4px 0 0; }
+.hom-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.hom-table th { background: #4B1462; color: white; padding: 5px 8px; border: 1px solid #4B1462; font-size: 10.5px; }
+.hom-table td { border: 1px solid #c9b8d9; padding: 4px 8px; vertical-align: middle; }
+.hom-table tbody tr:nth-child(even) { background: #f8f3ff; }
+</style>
+
+<!-- Controles de pantalla (no se imprimen) -->
+<div class="btn-herramientas" style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+  <button class="btn btn-primary" onclick="window.print()">
+    <i class="fa fa-print"></i> Imprimir / Guardar PDF
+  </button>
+  <a href="/recorridos" class="btn btn-outline btn-sm"><i class="fa fa-arrow-left"></i> Volver</a>
+  {% if recorrido.ruta_coords %}
+  <span style="font-size:12px;color:var(--gris-text)">
+    <i class="fa fa-circle-info" style="color:var(--morado)"></i>
+    Espera que el mapa cargue antes de imprimir
+  </span>
+  {% endif %}
+</div>
+
+<div class="rep-wrap">
+
+  <!-- ── ENCABEZADO ─────────────────────────── -->
+  <div class="rep-header">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <div style="background:rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;font-size:18px;font-weight:900;white-space:nowrap;align-self:center">
+        {{ recorrido.distancia_total }}m.
+      </div>
+      <div style="flex:1;text-align:center;line-height:1.6">
+        <div style="font-size:11.5px;letter-spacing:1px;text-transform:uppercase;opacity:0.85">
+          Hermandad del Señor de los Milagros de Nazarenas
+        </div>
+        <div style="font-size:10px;text-transform:uppercase;opacity:0.75;letter-spacing:0.5px">
+          Secretaría de Organización y Recorrido Procesional
+        </div>
+        <div style="font-size:19px;font-weight:900;margin-top:2px;letter-spacing:2px">
+          RECORRIDO PROCESIONAL
+        </div>
+        <div style="font-size:11px;margin-top:2px;opacity:0.9">
+          Referencia: <strong>{{ recorrido.nombre }}</strong>
+        </div>
+        <div style="font-size:11px;opacity:0.9">
+          Fecha: {{ recorrido.fecha }}
+        </div>
+      </div>
+      <div style="text-align:right;font-size:10.5px;line-height:1.9;opacity:0.9;white-space:nowrap">
+        <div style="font-size:9px;opacity:0.7;text-transform:uppercase">Secretario</div>
+        <div style="font-weight:700">{{ recorrido.secretario or '—' }}</div>
+        <div style="font-size:9px;opacity:0.7;text-transform:uppercase;margin-top:4px">Pro Sec.</div>
+        <div style="font-weight:700">{{ recorrido.pro_secretario or '—' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TABLA TOMA Y DEJA ──────────────────── -->
+  <table class="tyd-table">
+    <thead>
+      <tr>
+        <th style="width:56px">CUADRILLA</th>
+        <th style="width:52px">HORA</th>
+        <th>PUNTO DE INICIO Y/O TERMINO DE CARGUIO</th>
+        <th style="width:70px">METRAJE</th>
+        <th style="width:46px">Tiempo</th>
+        <th style="width:105px">Observacion</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in cuadrillas %}
+        {# Toma: primera cuadrilla usa punto_inicio del recorrido; las siguientes usan su propia ubicacion #}
+        {% if loop.first %}
+          {% set punto_toma = recorrido.punto_inicio or 'Inicio del Recorrido Procesional' %}
+        {% else %}
+          {% set punto_toma = c.ubicacion or '—' %}
+        {% endif %}
+        {# Deja: ubicacion de la SIGUIENTE cuadrilla; si es la última, usa su propio punto_deja #}
+        {% set next_c = cuadrillas[loop.index] if loop.index < cuadrillas|length else none %}
+        {% if c.es_ultima and c.punto_deja %}
+          {% set punto_deja = c.punto_deja %}
+        {% elif next_c and next_c.ubicacion %}
+          {% set punto_deja = next_c.ubicacion %}
+        {% else %}
+          {% set punto_deja = '—' %}
+        {% endif %}
+        {% set homs_cua   = homs_por_cuadrilla.get(c.numero, []) %}
+        {% set total_hom  = homs_cua | sum(attribute='tiempo_programado') %}
+
+        <!-- Fila TOMA -->
+        <tr class="row-toma">
+          <td rowspan="2" style="text-align:center;padding:6px 4px;border-bottom:2px solid #6E1E91">
+            <div class="cua-num">{{ c.numero }}</div>
+          </td>
+          <td class="hora-cell">{{ c.hora_toma or '–:–' }}</td>
+          <td><span class="toma-lbl">Toma:</span> {{ punto_toma }}</td>
+          <td class="metraje-cell" rowspan="2">{{ '%.2f'|format(c.metraje|float) }}</td>
+          <td class="tiempo-cell">Inicio</td>
+          <td></td>
+        </tr>
+        <!-- Fila DEJA -->
+        <tr class="row-deja">
+          <td class="hora-cell">{{ c.hora_deja or '–:–' }}</td>
+          <td><span class="deja-lbl">Deja:</span> {{ punto_deja }}</td>
+          <td class="tiempo-cell">Final</td>
+          <td class="hom-obs">
+            {% if total_hom > 0 %}
+              Total de Homenajes<br>{{ total_hom }} Min
+            {% endif %}
+          </td>
+        </tr>
+
+      {% else %}
+        <tr>
+          <td colspan="6" style="text-align:center;padding:28px;color:#999">
+            No hay cuadrillas registradas para este recorrido.
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- ── LEYENDA ─────────────────────────────── -->
+  <div class="leyenda-box">
+    <div class="head">Leyenda</div>
+    <div class="body">
+      <div>Significado de (SM) es: Según Marca</div>
+      <div>Aprox. 40 minutos por cada cuadrilla (El Tiempo exacto lo dará el Capataz General)</div>
+      <div>3 minutos por cambio de cuadrilla</div>
+      {% if cuadrillas %}
+        {% set metraje_prom = (cuadrillas | sum(attribute='metraje') / cuadrillas|length) | int %}
+        <div>Metraje promedio por Cuadrilla: {{ metraje_prom }}m.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── HOMENAJES ───────────────────────────── -->
+  {% if homenajes %}
+  <div style="margin-top:20px;page-break-inside:avoid">
+    <div class="hom-section-head">
+      <i class="fa fa-church"></i> Homenajes Programados ({{ homenajes|length }} · Total {{ homenajes|sum(attribute='tiempo_programado') }} min)
+    </div>
+    <table class="hom-table">
+      <thead>
+        <tr>
+          <th style="width:46px">Cua. #</th>
+          <th>Nombre del Homenaje</th>
+          <th>Ubicación</th>
+          <th style="width:80px">Tiempo Prog.</th>
+          <th style="width:65px">Prioridad</th>
+          <th>Observaciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in homenajes | sort(attribute='numero_cuadrilla') %}
+        <tr>
+          <td style="text-align:center;font-weight:700;color:#4B1462">
+            {% if h.numero_cuadrilla %}#{{ h.numero_cuadrilla }}{% else %}—{% endif %}
+          </td>
+          <td><strong>{{ h.nombre }}</strong></td>
+          <td>{{ h.ubicacion or '—' }}</td>
+          <td style="text-align:center;font-weight:700">{{ h.tiempo_programado }} min</td>
+          <td style="text-align:center">
+            {% if h.prioridad == 'alta' %}<span style="color:#c0392b;font-weight:700">Alta</span>
+            {% elif h.prioridad == 'media' %}<span style="color:#e67e22;font-weight:700">Media</span>
+            {% else %}<span style="color:#888">Baja</span>{% endif %}
+          </td>
+          <td style="color:#666">{{ h.observaciones or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ── MAPA DEL RECORRIDO ─────────────────── -->
+  {% if recorrido.ruta_coords %}
+  <div class="mapa-section" style="margin-top:24px">
+    <div style="background:#4B1462;color:white;font-weight:700;padding:7px 14px;font-size:12px;border-radius:4px 4px 0 0">
+      <i class="fa fa-map-location-dot"></i>&nbsp; Mapa del Recorrido Procesional — {{ recorrido.nombre }}
+    </div>
+    <div id="mapa-reporte" style="height:480px;border:2px solid #4B1462;border-top:none"></div>
+    <div style="padding:5px 10px;background:#faf5ff;border:1px solid #c9b8d9;border-top:none;font-size:10.5px;color:#666;display:flex;align-items:center;gap:10px">
+      <div style="width:24px;height:4px;background:#6E1E91;border-radius:2px;flex-shrink:0"></div>
+      <span>Ruta del Recorrido Procesional ({{ recorrido.ruta_coords|length }} puntos)</span>
+    </div>
+  </div>
+  {% endif %}
+
+</div><!-- /rep-wrap -->
+{% endblock %}
+
+{% block scripts %}
+{% if recorrido.ruta_coords %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const RUTA = {{ recorrido.ruta_coords | tojson }};
+
+const mapa = L.map('mapa-reporte', {
+  zoomControl: true, attributionControl: true, scrollWheelZoom: false
+});
+
+// Tiles CartoDB Positron — fondo gris neutro, sin colores de OSM
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+  maxZoom: 19,
+  subdomains: 'abcd'
+}).addTo(mapa);
+
+if (RUTA.length > 1) {
+  const linea = L.polyline(RUTA, {
+    color: '#6E1E91', weight: 6, opacity: 0.95, lineJoin: 'round', lineCap: 'round'
+  }).addTo(mapa);
+
+  // Marcadores de inicio y fin
+  const ini = RUTA[0];
+  const fin = RUTA[RUTA.length - 1];
+  L.circleMarker(ini, {
+    radius: 9, fillColor: '#27ae60', color: '#fff', weight: 2, fillOpacity: 1
+  }).bindTooltip('Inicio', { permanent: true, direction: 'right', offset: [8, 0],
+    className: 'leaflet-tooltip' }).addTo(mapa);
+  L.circleMarker(fin, {
+    radius: 9, fillColor: '#c0392b', color: '#fff', weight: 2, fillOpacity: 1
+  }).bindTooltip('Llegada', { permanent: true, direction: 'right', offset: [8, 0],
+    className: 'leaflet-tooltip' }).addTo(mapa);
+
+  mapa.fitBounds(linea.getBounds(), { padding: [28, 28] });
+}
+</script>
+{% endif %}
+{% endblock %}

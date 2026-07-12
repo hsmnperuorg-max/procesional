@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Recorrido{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fa fa-plus" style="color:var(--morado)"></i> Nuevo Recorrido Procesional</h1>
+    <p>Complete los datos del recorrido</p>
+  </div>
+  <a href="/recorridos" class="btn btn-outline"><i class="fa fa-arrow-left"></i> Volver</a>
+</div>
+<div class="card" style="max-width:720px">
+  <form method="POST" action="/recorridos/nuevo">
+    <div class="form-grid">
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Nombre del Recorrido</label>
+        <input type="text" name="nombre" placeholder="Ej: Primer Recorrido Procesional 2025" required>
+      </div>
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" name="fecha" required>
+      </div>
+      <div class="form-group">
+        <label>Distancia Total (metros)</label>
+        <input type="number" name="distancia" placeholder="4800" value="4800">
+      </div>
+      <div class="form-group">
+        <label>Hora de Salida</label>
+        <input type="time" name="hora_salida" value="08:00" required>
+      </div>
+      <div class="form-group">
+        <label>Hora Programada de Llegada</label>
+        <input type="time" name="hora_llegada" value="22:00" required>
+      </div>
+      <div class="form-group" style="grid-column:1/-1">
+        <label>Observaciones</label>
+        <textarea name="observaciones" rows="3" placeholder="Notas o consideraciones especiales..."></textarea>
+      </div>
+    </div>
+    <div class="form-actions" style="margin-top:20px">
+      <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Recorrido</button>
+      <a href="/recorridos" class="btn btn-outline">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

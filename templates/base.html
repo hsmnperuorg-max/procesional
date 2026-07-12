@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Sistema Procesional{% endblock %} – Señor de los Milagros</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+{% if session.usuario %}
+<nav class="navbar">
+  <div class="nav-brand">
+    <div class="nav-logo">✝</div>
+    <div>
+      <div class="nav-title">Señor de los Milagros</div>
+      <div class="nav-sub">Sistema de Control Procesional</div>
+    </div>
+  </div>
+  <ul class="nav-links">
+    <li><a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}"><i class="fa fa-gauge"></i> Dashboard</a></li>
+    <li><a href="/recorridos" class="{% if '/recorridos' in request.path %}active{% endif %}"><i class="fa fa-route"></i> Recorridos</a></li>
+    <li><a href="/cuadrillas" class="{% if '/cuadrillas' in request.path %}active{% endif %}"><i class="fa fa-people-group"></i> Cuadrillas</a></li>
+    <li><a href="/homenajes" class="{% if '/homenajes' in request.path %}active{% endif %}"><i class="fa fa-church"></i> Homenajes</a></li>
+    <li><a href="/mapa" class="{% if '/mapa' in request.path %}active{% endif %}"><i class="fa fa-map-location-dot"></i> Mapa</a></li>
+    <li><a href="/reporte/marcaciones" class="{% if '/reporte' in request.path %}active{% endif %}"><i class="fa fa-file-lines"></i> Reportes</a></li>
+    <li><a href="/tablet" class="nav-tablet {% if '/tablet' in request.path %}active{% endif %}"><i class="fa fa-tablet"></i> Tablet Campo</a></li>
+  </ul>
+  <div class="nav-user">
+    <span><i class="fa fa-user-circle"></i> {{ session.usuario.nombre }}</span>
+    <span class="rol-badge">{{ session.usuario.rol }}</span>
+    <a href="/logout" class="btn-logout">Salir</a>
+  </div>
+</nav>
+{% endif %}
+
+<main class="main-content {% if not session.usuario %}full{% endif %}">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

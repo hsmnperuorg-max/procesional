@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% set es_admin = usuario.rol in ['Administrador General', 'Super Admin'] %}
+{% block title %}Recorridos Procesionales{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fa fa-route" style="color:var(--morado)"></i> Recorridos Procesionales</h1>
+    <p>Administración de los recorridos del Señor de los Milagros</p>
+  </div>
+  {% if es_admin %}
+  <a href="/recorridos/nuevo" class="btn btn-primary"><i class="fa fa-plus"></i> Nuevo Recorrido</a>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2><i class="fa fa-calendar"></i> Recorridos Registrados ({{ recorridos|length }})</h2>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th><th>Fecha</th><th>Salida</th><th>Llegada Prog.</th><th>Distancia</th><th>Estado</th><th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recorridos %}
+        <tr>
+          <td>
+            <div style="font-weight:600">{{ r.nombre }}</div>
+            {% if r.observaciones %}<div style="font-size:12px;color:var(--gris-text)">{{ r.observaciones }}</div>{% endif %}
+          </td>
+          <td>{{ r.fecha }}</td>
+          <td><strong>{{ r.hora_salida }}</strong></td>
+          <td>{{ r.hora_llegada_programada }}</td>
+          <td>{{ "{:,}".format(r.distancia_total) }} m</td>
+          <td>
+            {% if r.estado == 'programado' %}<span class="badge badge-morado">Programado</span>
+            {% elif r.estado == 'en_curso' %}<span class="badge badge-verde"><span class="status-dot dot-verde"></span>En curso</span>
+            {% elif r.estado == 'completado' %}<span class="badge badge-dorado">Completado</span>
+            {% else %}<span class="badge badge-gris">{{ r.estado }}</span>{% endif %}
+          </td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap">
+            <a href="/dashboard" class="btn btn-sm btn-primary"><i class="fa fa-gauge"></i> Dashboard</a>
+            <a href="/recorridos/trazar/{{ r.id }}" class="btn btn-sm"
+               style="background:{% if r.ruta_coords %}var(--verde){% else %}var(--naranja){% endif %};color:white"
+               title="{% if r.ruta_coords %}Editar ruta trazada ({{ r.ruta_coords|length }} pts){% else %}Trazar ruta en el mapa{% endif %}">
+              <i class="fa fa-route"></i> {% if r.ruta_coords %}Editar ruta{% else %}Trazar ruta{% endif %}
+            </a>
+            <a href="/reporte/toma-y-deja/{{ r.id }}" class="btn btn-sm"
+               style="background:#8e24aa;color:white" title="Exportar Toma y Deja" target="_blank">
+              <i class="fa fa-file-export"></i> Toma y Deja
+            </a>
+            <button type="button" class="btn btn-sm btn-outline"
+                    data-id="{{ r.id }}"
+                    onclick="abrirEditarRec(this)">
+              <i class="fa fa-pencil"></i>
+            </button>
+            {% if es_admin %}
+            <button type="button" class="btn btn-sm btn-danger"
+                    data-rid="{{ r.id }}"
+                    data-nombre="{{ r.nombre }}"
+                    data-cuas="{{ cuas_por_rec.get(r.id, 0) }}"
+                    data-homs="{{ homs_por_rec.get(r.id, 0) }}"
+                    onclick="confirmarEliminar(this)"
+                    title="Eliminar recorrido (solo administrador)">
+              <i class="fa fa-trash"></i>
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--gris-text);padding:40px">No hay recorridos registrados aún.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal CONFIRMAR ELIMINAR (solo admin) -->
+{% if es_admin %}
+<div class="modal-overlay" id="modal-del-rec">
+  <div class="modal" style="max-width:480px">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="width:64px;height:64px;background:#fde8e8;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px">
+        <i class="fa fa-triangle-exclamation" style="font-size:28px;color:var(--rojo)"></i>
+      </div>
+      <h3 style="color:var(--rojo);margin-bottom:6px">¿Eliminar este recorrido?</h3>
+      <p id="del-rec-nombre" style="font-weight:700;font-size:15px;color:var(--morado-oscuro)"></p>
+    </div>
+
+    <div style="background:#fff5f5;border:1.5px solid #fcc;border-radius:10px;padding:14px;margin-bottom:20px">
+      <div style="color:var(--rojo);font-weight:700;font-size:13px;margin-bottom:8px">
+        <i class="fa fa-triangle-exclamation"></i>&nbsp; Esta acción también eliminará:
+      </div>
+      <ul style="margin:0;padding-left:20px;color:#555;font-size:13px;line-height:1.9">
+        <li><span id="del-rec-cuas" style="font-weight:600"></span></li>
+        <li><span id="del-rec-homs" style="font-weight:600"></span></li>
+        <li>Todos los eventos registrados de este recorrido</li>
+      </ul>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #fcc;color:#c0392b;font-size:12px;font-weight:700;text-align:center">
+        <i class="fa fa-lock"></i>&nbsp; Esta acción no se puede deshacer
+      </div>
+    </div>
+
+    <form method="POST" id="form-del-rec">
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button type="submit" class="btn btn-danger" style="padding:10px 24px;font-size:14px">
+          <i class="fa fa-trash"></i>&nbsp; Sí, eliminar todo
+        </button>
+        <button type="button" class="btn btn-outline" style="padding:10px 24px"
+                onclick="document.getElementById('modal-del-rec').classList.remove('open')">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal editar recorrido -->
+<div class="modal-overlay" id="modal-edit-rec">
+  <div class="modal" style="max-width:580px">
+    <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Recorrido</h3>
+    <form method="POST" id="form-edit-rec">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nombre del Recorrido</label>
+          <input type="text" name="nombre" id="edit-rec-nombre" required>
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" name="fecha" id="edit-rec-fecha" required>
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select name="estado" id="edit-rec-estado">
+            <option value="programado">Programado</option>
+            <option value="en_curso">En curso</option>
+            <option value="completado">Completado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Hora de Salida</label>
+          <input type="time" name="hora_salida" id="edit-rec-salida">
+        </div>
+        <div class="form-group">
+          <label>Hora Llegada Programada</label>
+          <input type="time" name="hora_llegada" id="edit-rec-llegada">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Distancia Total (m)</label>
+          <input type="number" name="distancia" id="edit-rec-distancia" min="0">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Punto de Inicio (descripción del lugar de partida)</label>
+          <input type="text" name="punto_inicio" id="edit-rec-inicio"
+            placeholder="Ej: Altar Mayor del Santuario del Señor de los Milagros de Nazarenas">
+        </div>
+        <div class="form-group">
+          <label>Secretario</label>
+          <input type="text" name="secretario" id="edit-rec-secretario" placeholder="Nombre del Secretario">
+        </div>
+        <div class="form-group">
+          <label>Pro Secretario</label>
+          <input type="text" name="pro_secretario" id="edit-rec-prosec" placeholder="Nombre del Pro Secretario">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Observaciones</label>
+          <textarea name="observaciones" id="edit-rec-obs" rows="2" placeholder="Notas adicionales..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cambios</button>
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-edit-rec').classList.remove('open')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if es_admin %}
+<!-- Script de eliminación en bloque separado — no depende de RECORRIDOS_DATA -->
+<script>
+function confirmarEliminar(btn) {
+  const id    = btn.dataset.rid;
+  const nombre= btn.dataset.nombre;
+  const nCuas = parseInt(btn.dataset.cuas) || 0;
+  const nHoms = parseInt(btn.dataset.homs) || 0;
+  document.getElementById('del-rec-nombre').textContent = nombre;
+  document.getElementById('del-rec-cuas').textContent =
+    nCuas + ' cuadrilla' + (nCuas !== 1 ? 's' : '') + ' asignada' + (nCuas !== 1 ? 's' : '') + ' a este recorrido';
+  document.getElementById('del-rec-homs').textContent =
+    nHoms + ' homenaje' + (nHoms !== 1 ? 's' : '') + ' registrado' + (nHoms !== 1 ? 's' : '');
+  document.getElementById('form-del-rec').action = '/recorridos/eliminar/' + id;
+  document.getElementById('modal-del-rec').classList.add('open');
+}
+document.getElementById('modal-del-rec').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+{% endif %}
+
+<!-- Script principal con datos de recorridos (sin ruta_coords) -->
+<script>
+const RECORRIDOS_DATA = {{ recorridos_js | tojson }};
+
+function abrirEditarRec(btn) {
+  const r = RECORRIDOS_DATA.find(x => x.id === btn.dataset.id);
+  if (!r) return;
+  const form = document.getElementById('form-edit-rec');
+  form.action = '/recorridos/editar/' + r.id;
+  document.getElementById('edit-rec-nombre').value     = r.nombre;
+  document.getElementById('edit-rec-fecha').value      = r.fecha;
+  document.getElementById('edit-rec-estado').value     = r.estado || 'programado';
+  document.getElementById('edit-rec-salida').value     = r.hora_salida || '';
+  document.getElementById('edit-rec-llegada').value    = r.hora_llegada_programada || '';
+  document.getElementById('edit-rec-distancia').value  = r.distancia_total;
+  document.getElementById('edit-rec-inicio').value     = r.punto_inicio    || '';
+  document.getElementById('edit-rec-secretario').value = r.secretario      || '';
+  document.getElementById('edit-rec-prosec').value     = r.pro_secretario  || '';
+  document.getElementById('edit-rec-obs').value        = r.observaciones   || '';
+  document.getElementById('modal-edit-rec').classList.add('open');
+}
+
+document.getElementById('modal-edit-rec').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+{% endblock %}

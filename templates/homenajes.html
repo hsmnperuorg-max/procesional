@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Homenajes{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1><i class="fa fa-church" style="color:var(--morado)"></i> Gestión de Homenajes</h1>
+    <p>Registro y control de homenajes programados</p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('modal-hom').classList.add('open')">
+    <i class="fa fa-plus"></i> Nuevo Homenaje
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2><i class="fa fa-list"></i> Homenajes Programados ({{ homenajes|length }})</h2>
+    <span style="font-size:13px;color:var(--gris-text)">
+      Tiempo total: <strong>{{ homenajes | sum(attribute='tiempo_programado') }} min</strong>
+    </span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nombre</th><th>Ubicación</th><th>Tiempo Prog.</th><th>Prioridad</th><th>Cargo</th><th>Observaciones</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for h in homenajes %}
+        <tr>
+          <td><strong>{{ h.nombre }}</strong></td>
+          <td><i class="fa fa-location-dot" style="color:var(--morado)"></i> {{ h.ubicacion }}</td>
+          <td><span class="badge badge-morado">{{ h.tiempo_programado }} min</span></td>
+          <td>
+            {% if h.prioridad == 'alta' %}<span class="badge badge-rojo">Alta</span>
+            {% elif h.prioridad == 'media' %}<span class="badge badge-naranja">Media</span>
+            {% else %}<span class="badge badge-gris">Baja</span>{% endif %}
+          </td>
+          <td>
+            {% if h.cargo_a == 'institucion' %}<span class="badge badge-morado">Institución</span>
+            {% else %}<span class="badge badge-gris">Cuadrilla</span>{% endif %}
+          </td>
+          <td style="font-size:12px;color:var(--gris-text)">{{ h.observaciones or '–' }}</td>
+          <td style="display:flex;gap:6px">
+            <button type="button" class="btn btn-sm btn-outline"
+                    data-id="{{ h.id }}"
+                    onclick="abrirEditarHom(this)">
+              <i class="fa fa-pencil"></i>
+            </button>
+            <form method="POST" action="/homenajes/eliminar/{{ h.id }}" onsubmit="return confirm('¿Eliminar este homenaje?')">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--gris-text);padding:40px">No hay homenajes registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal nuevo homenaje -->
+<div class="modal-overlay" id="modal-hom">
+  <div class="modal">
+    <h3><i class="fa fa-church" style="color:var(--morado)"></i> Nuevo Homenaje</h3>
+    <form method="POST" action="/homenajes/nuevo">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Recorrido</label>
+          <select name="recorrido_id" required>
+            {% for r in recorridos %}
+            <option value="{{ r.id }}">{{ r.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label># Cuadrilla <span style="font-size:10px;color:var(--gris-text)">(¿durante cuál cuadrilla?)</span></label>
+          <input type="number" name="numero_cuadrilla" min="1" placeholder="Ej: 5">
+        </div>
+        <div class="form-group">
+          <label>Tiempo Programado (min)</label>
+          <input type="number" name="tiempo_programado" value="10" min="1">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nombre del Homenaje</label>
+          <input type="text" name="nombre" placeholder="Ej: Homenaje Palacio de Gobierno" required>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Ubicación</label>
+          <input type="text" name="ubicacion" placeholder="Jr. de la Unión cdra. 1">
+        </div>
+        <div class="form-group">
+          <label>Prioridad</label>
+          <select name="prioridad">
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Cargo del Tiempo <span style="font-size:10px;color:var(--gris-text)">(¿a quién se le carga el tiempo de este homenaje?)</span></label>
+          <select name="cargo_a">
+            <option value="cuadrilla">Cuadrilla — se le carga al tiempo de la cuadrilla</option>
+            <option value="institucion">Institución — se le carga al tiempo general</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Observaciones</label>
+          <textarea name="observaciones" rows="2" placeholder="Notas adicionales..."></textarea>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar</button>
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-hom').classList.remove('open')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal editar homenaje -->
+<div class="modal-overlay" id="modal-edit-hom">
+  <div class="modal">
+    <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Homenaje</h3>
+    <form method="POST" id="form-edit-hom">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Recorrido</label>
+          <select name="recorrido_id" id="edit-hom-recorrido" required>
+            {% for r in recorridos %}
+            <option value="{{ r.id }}">{{ r.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label># Cuadrilla <span style="font-size:10px;color:var(--gris-text)">(¿durante cuál?)</span></label>
+          <input type="number" name="numero_cuadrilla" id="edit-hom-cua" min="1" placeholder="Ej: 5">
+        </div>
+        <div class="form-group">
+          <label>Tiempo Programado (min)</label>
+          <input type="number" name="tiempo_programado" id="edit-hom-tiempo" min="1">
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nombre del Homenaje</label>
+          <input type="text" name="nombre" id="edit-hom-nombre" required>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Ubicación</label>
+          <input type="text" name="ubicacion" id="edit-hom-ubicacion">
+        </div>
+        <div class="form-group">
+          <label>Prioridad</label>
+          <select name="prioridad" id="edit-hom-prioridad">
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Cargo del Tiempo <span style="font-size:10px;color:var(--gris-text)">(¿a quién se le carga el tiempo de este homenaje?)</span></label>
+          <select name="cargo_a" id="edit-hom-cargo">
+            <option value="cuadrilla">Cuadrilla — se le carga al tiempo de la cuadrilla</option>
+            <option value="institucion">Institución — se le carga al tiempo general</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Observaciones</label>
+          <textarea name="observaciones" id="edit-hom-obs" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:16px">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Cambios</button>
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-edit-hom').classList.remove('open')">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const HOMENAJES_DATA = {{ homenajes | tojson }};
+
+function abrirEditarHom(btn) {
+  const h = HOMENAJES_DATA.find(x => x.id === btn.dataset.id);
+  if (!h) return;
+  const form = document.getElementById('form-edit-hom');
+  form.action = `/homenajes/editar/${h.id}`;
+  document.getElementById('edit-hom-recorrido').value = h.recorrido_id || '';
+  document.getElementById('edit-hom-cua').value       = h.numero_cuadrilla || '';
+  document.getElementById('edit-hom-tiempo').value    = h.tiempo_programado;
+  document.getElementById('edit-hom-nombre').value    = h.nombre;
+  document.getElementById('edit-hom-ubicacion').value = h.ubicacion || '';
+  document.getElementById('edit-hom-prioridad').value = h.prioridad || 'media';
+  document.getElementById('edit-hom-cargo').value     = h.cargo_a || 'cuadrilla';
+  document.getElementById('edit-hom-obs').value       = h.observaciones || '';
+  document.getElementById('modal-edit-hom').classList.add('open');
+}
+
+document.getElementById('modal-hom').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+document.getElementById('modal-edit-hom').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+{% endblock %}

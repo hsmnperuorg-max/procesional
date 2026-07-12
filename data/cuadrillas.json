@@ -1,0 +1,53 @@
+[
+  {
+    "id": "cua-a04e809c",
+    "recorrido_id": "rec-52d76309",
+    "numero": 1,
+    "cuadrilla": "Cuadrilla 1",
+    "tipo": "regular",
+    "hermandad_invitada": "",
+    "ubicacion": "JR TACNA 1650",
+    "punto_deja": "",
+    "es_ultima": false,
+    "metraje": 40,
+    "tiempo_estimado": 10,
+    "hora_toma": "08:00",
+    "hora_deja": "08:45",
+    "lat": -12.04586,
+    "lng": -77.037345
+  },
+  {
+    "id": "cua-34602202",
+    "recorrido_id": "rec-52d76309",
+    "numero": 2,
+    "cuadrilla": "Cuadrilla 2",
+    "tipo": "regular",
+    "hermandad_invitada": "",
+    "ubicacion": "JR EMANCIPACION 108",
+    "punto_deja": "",
+    "es_ultima": false,
+    "metraje": 40,
+    "tiempo_estimado": 10,
+    "hora_toma": "08:00",
+    "hora_deja": "08:45",
+    "lat": -12.046225,
+    "lng": -77.037597
+  },
+  {
+    "id": "cua-00e00dc5",
+    "recorrido_id": "rec-52d76309",
+    "numero": 3,
+    "cuadrilla": "Cuadrilla 3",
+    "tipo": "regular",
+    "hermandad_invitada": "",
+    "ubicacion": "jr huancavelica 55",
+    "punto_deja": "nazarenas",
+    "es_ultima": true,
+    "metraje": 300,
+    "tiempo_estimado": 45,
+    "hora_toma": "08:00",
+    "hora_deja": "08:45",
+    "lat": -12.045259,
+    "lng": -77.037367
+  }
+]

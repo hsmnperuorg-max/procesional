@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}Trazador de Ruta{% endblock %}
+
+{% block content %}
+<!-- Barra de control -->
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:16px;flex-wrap:wrap">
+  <div>
+    <h1 style="font-size:20px;font-weight:700;color:var(--morado-oscuro);display:flex;align-items:center;gap:8px">
+      <i class="fa fa-route" style="color:var(--morado)"></i>
+      Trazador de Ruta — {{ recorrido.nombre }}
+    </h1>
+    <p style="font-size:13px;color:var(--gris-text);margin-top:3px">
+      <i class="fa fa-circle-info" style="color:var(--morado)"></i>
+      Haz clic sobre el mapa siguiendo las calles para trazar el recorrido. Puedes hacer zoom para mayor precisión.
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+    <span id="badge-puntos" style="background:#e0e0e0;color:#666;padding:4px 12px;border-radius:12px;font-size:13px;font-weight:600">
+      0 puntos
+    </span>
+    <span id="badge-guardado" style="display:none;background:#edfaf3;color:var(--verde);padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600">
+      <i class="fa fa-check"></i> Guardado
+    </span>
+    <button onclick="deshacer()" class="btn btn-sm btn-outline" id="btn-deshacer" disabled>
+      <i class="fa fa-rotate-left"></i> Deshacer
+    </button>
+    <button onclick="limpiar()" class="btn btn-sm btn-danger" id="btn-limpiar" disabled>
+      <i class="fa fa-trash"></i> Limpiar
+    </button>
+    <button onclick="guardar()" class="btn btn-primary" id="btn-guardar" disabled>
+      <i class="fa fa-save"></i> Guardar Ruta
+    </button>
+    <a href="/recorridos" class="btn btn-outline btn-sm">Volver</a>
+  </div>
+</div>
+
+<!-- Mapa -->
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="padding:8px 16px;background:linear-gradient(90deg,#f0e6fa,#fff);border-bottom:1px solid var(--gris);font-size:13px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:24px;height:6px;background:var(--morado);border-radius:3px"></div>
+      <span style="color:var(--gris-text)">Ruta trazada</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:10px;height:10px;background:var(--dorado);border:2px solid var(--morado);border-radius:50%"></div>
+      <span style="color:var(--gris-text)">Puntos de relevo fijados en cuadrillas</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:10px;height:10px;background:#27ae60;border-radius:50%"></div>
+      <span style="color:var(--gris-text)">Punto recién agregado</span>
+    </div>
+    <div style="margin-left:auto;font-size:12px;color:var(--gris-text)">
+      💡 Haz zoom con la rueda del ratón · Mantén <kbd style="background:#eee;padding:1px 5px;border-radius:3px;border:1px solid #ccc">Ctrl</kbd> y haz clic para eliminar el último punto
+    </div>
+  </div>
+  <div id="map-trazo" style="height:630px;cursor:crosshair"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast-trazo" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  padding:13px 28px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;
+  box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;pointer-events:none"></div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const RID = '{{ recorrido.id }}';
+const EXISTING_COORDS  = {{ (recorrido.ruta_coords or []) | tojson }};
+const CUADRILLAS_MARKS = {{ cuadrillas | tojson }};
+
+let coords   = [];   // [[lat, lng], ...]
+let dotMarkers = []; // Leaflet circleMarkers para cada punto
+let polyline = null;
+let unsaved  = false;
+
+// ── MAPA ──────────────────────────────────────
+const map = L.map('map-trazo', { zoomControl: true }).setView([-12.0474, -77.0390], 16);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 20
+}).addTo(map);
+
+// Referencia: puntos de relevo de cuadrillas ya fijados
+CUADRILLAS_MARKS.forEach(c => {
+  if (!c.lat || !c.lng) return;
+  L.circleMarker([c.lat, c.lng], {
+    radius: 8, fillColor: '#D4AF37', color: '#4B1462', weight: 2, fillOpacity: 0.9
+  }).bindTooltip(`<strong>Cuadrilla ${c.numero} – ${c.cuadrilla}</strong><br>Punto de relevo`, { direction: 'top' }).addTo(map);
+});
+
+// Cargar ruta existente
+if (EXISTING_COORDS.length > 0) {
+  coords = EXISTING_COORDS.map(p => [p[0], p[1]]);
+  renderizarTodo(false);
+  map.fitBounds(L.latLngBounds(coords), { padding: [30, 30] });
+  unsaved = false;
+  actualizarUI();
+}
+
+// ── CLIC PARA AGREGAR PUNTO ────────────────────
+map.on('click', function(e) {
+  if (e.originalEvent.ctrlKey) { deshacer(); return; }
+
+  const p = [parseFloat(e.latlng.lat.toFixed(7)), parseFloat(e.latlng.lng.toFixed(7))];
+  coords.push(p);
+  unsaved = true;
+
+  // Redibujar último marcador como "normal" y agregar nuevo resaltado
+  if (dotMarkers.length > 0) {
+    const prev = dotMarkers[dotMarkers.length - 1];
+    prev.setStyle({ fillColor: '#6E1E91', radius: 4 });
+  }
+
+  const m = L.circleMarker(p, {
+    radius: 7, fillColor: '#27ae60', color: '#fff', weight: 2, fillOpacity: 1
+  }).addTo(map);
+  dotMarkers.push(m);
+
+  dibujarLinea();
+  actualizarUI();
+  ocultarGuardado();
+});
+
+// ── FUNCIONES ──────────────────────────────────
+function dibujarLinea() {
+  if (polyline) map.removeLayer(polyline);
+  polyline = null;
+  if (coords.length > 1) {
+    polyline = L.polyline(coords, {
+      color: '#6E1E91', weight: 6, opacity: 0.9, lineJoin: 'round', lineCap: 'round'
+    }).addTo(map);
+  }
+}
+
+function renderizarTodo(marcarUltimo = true) {
+  // Limpiar
+  dotMarkers.forEach(m => map.removeLayer(m));
+  dotMarkers = [];
+  if (polyline) { map.removeLayer(polyline); polyline = null; }
+
+  coords.forEach((p, i) => {
+    const esUltimo = marcarUltimo && i === coords.length - 1;
+    const m = L.circleMarker(p, {
+      radius:      esUltimo ? 7 : 4,
+      fillColor:   esUltimo ? '#27ae60' : '#6E1E91',
+      color:       '#fff',
+      weight:      2,
+      fillOpacity: 1,
+    }).addTo(map);
+    dotMarkers.push(m);
+  });
+
+  dibujarLinea();
+}
+
+function deshacer() {
+  if (coords.length === 0) return;
+  coords.pop();
+  const m = dotMarkers.pop();
+  if (m) map.removeLayer(m);
+
+  // El nuevo último punto vuelve a ser "verde"
+  if (dotMarkers.length > 0) {
+    dotMarkers[dotMarkers.length - 1].setStyle({ fillColor: '#27ae60', radius: 7 });
+  }
+
+  dibujarLinea();
+  unsaved = true;
+  actualizarUI();
+  ocultarGuardado();
+}
+
+function limpiar() {
+  if (coords.length === 0) return;
+  if (!confirm('¿Limpiar toda la ruta trazada? Se perderá el trazo actual.')) return;
+  coords = [];
+  dotMarkers.forEach(m => map.removeLayer(m));
+  dotMarkers = [];
+  if (polyline) { map.removeLayer(polyline); polyline = null; }
+  unsaved = true;
+  actualizarUI();
+  ocultarGuardado();
+}
+
+async function guardar() {
+  if (coords.length < 2) {
+    mostrarToast('Traza al menos 2 puntos para guardar la ruta', '#e67e22');
+    return;
+  }
+  document.getElementById('btn-guardar').innerHTML = '<i class="fa fa-spinner fa-spin"></i> Guardando…';
+  try {
+    const resp = await fetch('/api/ruta/guardar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rid: RID, coords })
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      unsaved = false;
+      mostrarToast(`✓ Ruta guardada — ${data.puntos} puntos`, '#27ae60');
+      document.getElementById('badge-guardado').style.display = 'inline-block';
+    }
+  } catch(e) {
+    mostrarToast('Error al guardar. Verifica la conexión.', '#c0392b');
+  } finally {
+    document.getElementById('btn-guardar').innerHTML = '<i class="fa fa-save"></i> Guardar Ruta';
+  }
+}
+
+function actualizarUI() {
+  const n = coords.length;
+  const badge = document.getElementById('badge-puntos');
+  badge.textContent = n === 0 ? '0 puntos' : n === 1 ? '1 punto' : `${n} puntos`;
+  badge.style.background = n > 1 ? 'rgba(110,30,145,0.15)' : '#e0e0e0';
+  badge.style.color       = n > 1 ? 'var(--morado)'        : '#666';
+
+  document.getElementById('btn-deshacer').disabled = n === 0;
+  document.getElementById('btn-limpiar').disabled  = n === 0;
+  document.getElementById('btn-guardar').disabled  = n < 2;
+}
+
+function ocultarGuardado() {
+  document.getElementById('badge-guardado').style.display = 'none';
+}
+
+function mostrarToast(msg, color) {
+  const t = document.getElementById('toast-trazo');
+  t.textContent    = msg;
+  t.style.background = color;
+  t.style.display    = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.display = 'none', 3500);
+}
+
+// Aviso al salir sin guardar
+window.addEventListener('beforeunload', e => {
+  if (unsaved && coords.length > 0) {
+    e.preventDefault(); e.returnValue = '';
+  }
+});
+
+actualizarUI();
+</script>
+{% endblock %}
