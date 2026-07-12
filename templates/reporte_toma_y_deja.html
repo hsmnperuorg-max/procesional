@@ -144,7 +144,7 @@
           <td rowspan="2" style="text-align:center;padding:6px 4px;border-bottom:2px solid #6E1E91">
             <div class="cua-cell">
               <div class="cua-num">{{ c.numero }}</div>
-              <div class="cua-nombre">{{ c.cuadrilla }}{% if c.tipo == 'invitados' and c.hermandad_invitada %}<br>{{ c.hermandad_invitada }}{% endif %}</div>
+              <div class="cua-nombre">{{ c.cuadrilla or ('Cuadrilla ' ~ c.numero) }}{% if c.tipo == 'invitados' and c.hermandad_invitada %}<br>{{ c.hermandad_invitada }}{% endif %}</div>
             </div>
           </td>
           <td class="hora-cell">{{ c.hora_toma or '–:–' }}</td>
