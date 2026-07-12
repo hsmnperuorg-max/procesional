@@ -10,7 +10,10 @@
 <body>
 
 {% if session.usuario %}
-<nav class="navbar">
+<header class="topbar">
+  <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebarMenu">
+    <i class="fa fa-bars"></i>
+  </button>
   <div class="nav-brand">
     <div class="nav-logo">✝</div>
     <div>
@@ -18,6 +21,15 @@
       <div class="nav-sub">Sistema de Control Procesional</div>
     </div>
   </div>
+  <div class="nav-user">
+    <span class="nav-user-name"><i class="fa fa-user-circle"></i> {{ session.usuario.nombre }}</span>
+    <span class="rol-badge">{{ session.usuario.rol }}</span>
+    <a href="/logout" class="btn-logout"><i class="fa fa-right-from-bracket"></i> <span class="btn-logout-text">Salir</span></a>
+  </div>
+</header>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<nav class="sidebar" id="sidebarMenu">
   <ul class="nav-links">
     {% if tiene_acceso(session.usuario.rol, 'dashboard') %}
     <li><a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}"><i class="fa fa-gauge"></i> Dashboard</a></li>
@@ -44,11 +56,6 @@
     <li><a href="/usuarios" class="{% if '/usuarios' in request.path %}active{% endif %}"><i class="fa fa-users-gear"></i> Usuarios</a></li>
     {% endif %}
   </ul>
-  <div class="nav-user">
-    <span><i class="fa fa-user-circle"></i> {{ session.usuario.nombre }}</span>
-    <span class="rol-badge">{{ session.usuario.rol }}</span>
-    <a href="/logout" class="btn-logout">Salir</a>
-  </div>
 </nav>
 {% endif %}
 

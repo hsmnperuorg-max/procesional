@@ -7,9 +7,9 @@
     <h1><i class="fa fa-map-location-dot" style="color:var(--morado)"></i> Seguimiento en Tiempo Real</h1>
     <p id="sub-nombre">{{ recorrido.nombre if recorrido else '–' }}</p>
   </div>
-  <div style="display:flex;gap:10px;align-items:center">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <select id="sel-recorrido" onchange="cambiarRecorrido(this.value)"
-            style="padding:8px 14px;border-radius:7px;border:1.5px solid var(--morado);font-size:13px;color:var(--morado-oscuro)">
+            style="padding:8px 14px;border-radius:7px;border:1.5px solid var(--morado);font-size:13px;color:var(--morado-oscuro);max-width:100%">
       {% for r in recorridos %}
       <option value="{{ r.id }}" {% if recorrido and r.id == recorrido.id %}selected{% endif %}>{{ r.nombre }}</option>
       {% endfor %}
@@ -50,7 +50,7 @@
 </div>
 
 <!-- Mapa + checkpoints -->
-<div style="display:grid;grid-template-columns:1fr 300px;gap:16px;align-items:start">
+<div class="mapa-layout">
 
   <!-- Mapa -->
   <div class="card" style="padding:0;overflow:hidden">
