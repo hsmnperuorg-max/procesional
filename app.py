@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import json, os, uuid
 
 app = Flask(__name__)
-app.secret_key = 'hermandad-nazarenas-2024'
+app.secret_key = os.environ.get('SECRET_KEY', 'hermandad-nazarenas-2024')
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -902,4 +902,5 @@ def reporte_marcaciones():
         usuario=session['usuario'])
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
