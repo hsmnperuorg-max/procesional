@@ -30,6 +30,7 @@
 .tb-obs  { background: #f5f5f5; color: #555; }
 .tb-otro { background: #f5d8d8; color: #8b0000; }
 .tb-sec  { background: #d0f0ea; color: #0e6655; }
+.tb-pausa { background: #fde3cc; color: #af601a; }
 
 .dur-ok  { color: var(--verde, #27ae60); font-weight: 700; }
 .dur-late { color: var(--rojo, #c0392b); font-weight: 700; }
@@ -86,6 +87,10 @@
   <div class="kpi-mini">
     <div class="val">{{ n_obs }}</div>
     <div class="lbl">Observaciones</div>
+  </div>
+  <div class="kpi-mini">
+    <div class="val">{{ n_pausas }}</div>
+    <div class="lbl">Pausas de Sector</div>
   </div>
 </div>
 
@@ -281,6 +286,36 @@
         {% for r in reg_obs %}
         <tr>
           <td style="text-align:center;font-weight:700">{{ r.hora_inicio }}</td>
+          <td>{{ r.observacion|default:'–' }}</td>
+          <td style="font-size:11px">{{ r.usuario }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% if reg_pausas %}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-header">
+    <h2 style="color:#af601a"><i class="fa fa-pause"></i> Pausas de Sector Registradas ({{ reg_pausas|length }})</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="marc-table">
+      <thead>
+        <tr>
+          <th style="width:70px">Hora</th>
+          <th>Cuadrilla</th>
+          <th>Observación</th>
+          <th style="width:100px">Usuario</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reg_pausas %}
+        <tr>
+          <td style="text-align:center;font-weight:700">{{ r.hora_inicio }}</td>
+          <td>{{ r.ref_nombre|default:'–' }}</td>
           <td>{{ r.observacion|default:'–' }}</td>
           <td style="font-size:11px">{{ r.usuario }}</td>
         </tr>

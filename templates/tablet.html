@@ -103,6 +103,9 @@
     <button class="btn-tablet fin-sec" onclick="registrar('fin_sector')">
       <i class="fa fa-flag-checkered"></i>FIN DE SECTOR
     </button>
+    <button class="btn-tablet pausa-sec" onclick="registrar('pausa_sector')">
+      <i class="fa fa-pause"></i>PAUSA SECTOR
+    </button>
     <button class="btn-tablet observ" onclick="abrirObservacion()">
       <i class="fa fa-note-sticky"></i>REGISTRAR OBSERVACIÓN
     </button>
@@ -341,6 +344,7 @@ const TIPOS_LABEL = {
   fin_cambio:       '✓ Fin cambio',
   inicio_sector:    '📍 Inicio sector',
   fin_sector:       '🏁 Fin sector',
+  pausa_sector:     '⏸ Pausa sector',
   observacion:      '📝 Observación',
 };
 
@@ -363,7 +367,7 @@ async function registrar(tipo, obs = '') {
     return;
   }
 
-  const tiposDeCuadrilla = ['inicio_cuadrilla', 'fin_cuadrilla', 'inicio_sector', 'fin_sector'];
+  const tiposDeCuadrilla = ['inicio_cuadrilla', 'fin_cuadrilla', 'inicio_sector', 'fin_sector', 'pausa_sector'];
   if (tiposDeCuadrilla.includes(tipo) && cuadrillasFinalizadas.includes(refId)) {
     mostrarToast('🔒 Esta cuadrilla ya fue finalizada. Selecciona otra cuadrilla o item para continuar.', 'naranja');
     return;

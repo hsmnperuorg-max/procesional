@@ -112,6 +112,7 @@ class Evento(models.Model):
         ('fin_cambio', 'Fin cambio'),
         ('inicio_sector', 'Inicio sector'),
         ('fin_sector', 'Fin sector'),
+        ('pausa_sector', 'Pausa sector'),
         ('observacion', 'Observación'),
     ]
 

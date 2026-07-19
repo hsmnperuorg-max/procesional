@@ -622,12 +622,23 @@ def reporte_marcaciones(request):
                 'hora_fin': None, 'duracion': None, 'ref_id': None, 'ref_nombre': '',
                 'usuario': e.usuario, 'observacion': e.observacion,
             })
+        elif tipo == 'pausa_sector':
+            ref_id = e.referencia_id
+            ref_name = ''
+            if ref_id in cua_idx:
+                ref_name = f'#{cua_idx[ref_id].numero} — {cua_idx[ref_id].cuadrilla}'
+            registros.append({
+                'tipo': 'pausa_sector', 'hora_inicio': e.fecha_hora.strftime('%H:%M'),
+                'hora_fin': None, 'duracion': None, 'ref_id': ref_id, 'ref_nombre': ref_name,
+                'usuario': e.usuario, 'observacion': e.observacion,
+            })
 
     TIPO_BADGE = {
         'inicio_cuadrilla': ('tb-cua', '▶ Inicio Cua.'), 'fin_cuadrilla': ('tb-cua', '⏹ Fin Cua.'),
         'inicio_homenaje': ('tb-hom', '🙏 Inicio Hom.'), 'fin_homenaje': ('tb-hom', '✓ Fin Hom.'),
         'inicio_cambio': ('tb-cam', '🔄 Inicio Cambio'), 'fin_cambio': ('tb-cam', '✓ Fin Cambio'),
         'inicio_sector': ('tb-sec', '📍 Inicio Sector'), 'fin_sector': ('tb-sec', '🏁 Fin Sector'),
+        'pausa_sector': ('tb-pausa', '⏸ Pausa Sector'),
     }
     eventos_view = []
     for e in eventos_list:
@@ -652,9 +663,11 @@ def reporte_marcaciones(request):
         'n_cam': sum(1 for r in registros if r['tipo'] == 'fin_cambio'),
         'n_sec': sum(1 for r in registros if r['tipo'] == 'fin_sector'),
         'n_obs': sum(1 for e in eventos_list if e.tipo == 'observacion'),
+        'n_pausas': sum(1 for e in eventos_list if e.tipo == 'pausa_sector'),
         'reg_cua': [r for r in registros if r['tipo'] == 'fin_cuadrilla'],
         'reg_hom': [r for r in registros if r['tipo'] == 'fin_homenaje'],
         'reg_cam': [r for r in registros if r['tipo'] == 'fin_cambio'],
         'reg_sec': [r for r in registros if r['tipo'] == 'fin_sector'],
         'reg_obs': [r for r in registros if r['tipo'] == 'observacion'],
+        'reg_pausas': [r for r in registros if r['tipo'] == 'pausa_sector'],
     })

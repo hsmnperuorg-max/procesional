@@ -214,6 +214,7 @@ tr:last-child td { border-bottom: none; }
 .btn-tablet.fin-hom    { background: linear-gradient(135deg, #d35400, #a04000); }
 .btn-tablet.inicio-sec { background: linear-gradient(135deg, #16a085, #0e6655); }
 .btn-tablet.fin-sec    { background: linear-gradient(135deg, #0e6655, #093d31); }
+.btn-tablet.pausa-sec  { background: linear-gradient(135deg, #e67e22, #af601a); grid-column: 1 / -1; }
 .btn-tablet.observ     { background: linear-gradient(135deg, #2980b9, #1a5276); grid-column: 1 / -1; }
 .btn-tablet:disabled   { opacity: 0.4; cursor: not-allowed; transform: none !important; }
 .log-tablet { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 14px; max-height: 220px; overflow-y: auto; }
