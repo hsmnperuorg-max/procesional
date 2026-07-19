@@ -2,6 +2,7 @@ import json
 from datetime import date, datetime, timedelta
 
 from django.contrib import messages
+from django.contrib.staticfiles.finders import find as find_static
 from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -519,6 +520,22 @@ def api_posicion_mapa(request):
     })
 
 
+FOTO_CUADRILLA_EXTS = ('png', 'jpg', 'jpeg', 'webp')
+
+
+def _foto_cuadrilla(c):
+    """Busca en static/img/cuadrilla/ una foto para esta cuadrilla: por número
+    (ej. "12.png"), salvo Hermanos Honorarios que se busca como "honorarios"
+    (con fallback a "honorario", que es el nombre real del archivo subido)."""
+    claves = ('honorarios', 'honorario') if c.tipo == 'honorarios' else (str(c.numero),)
+    for clave in claves:
+        for ext in FOTO_CUADRILLA_EXTS:
+            rel = f'img/cuadrilla/{clave}.{ext}'
+            if find_static(rel):
+                return rel
+    return None
+
+
 # ── REPORTES ──────────────────────────────
 @requiere_seccion('reportes')
 def reporte_toma_y_deja(request, rid):
@@ -544,6 +561,7 @@ def reporte_toma_y_deja(request, rid):
         filas.append({
             'c': c, 'punto_toma': punto_toma, 'punto_deja': punto_deja,
             'total_hom': sum(h.tiempo_programado for h in homs_cua),
+            'foto': _foto_cuadrilla(c),
         })
 
     metraje_prom = int(sum(c.metraje for c in cuas) / len(cuas)) if cuas else 0
