@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% load permisos_extras %}
+{% load permisos_extras static %}
 {% block title %}Tablet de Campo{% endblock %}
 {% block content %}
 <div class="tablet-page">
   <div class="tablet-header">
-    <div style="font-size:28px">✝</div>
+    <div><img src="{% static 'img/icono_hsmn.png' %}" alt="HSMN" style="height:28px;width:auto;object-fit:contain"></div>
     <h1>Control de Campo</h1>
     {% if user.rol == 'Super Admin' %}
     <p style="margin-bottom:4px">
