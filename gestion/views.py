@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from cuentas.models import registrar_auditoria
@@ -303,7 +304,7 @@ def api_evento(request):
     )
     return JsonResponse({'ok': True, 'evento': {
         'id': evento.id, 'tipo': evento.tipo, 'referencia_id': evento.referencia_id,
-        'fecha_hora': evento.fecha_hora.strftime('%Y-%m-%d %H:%M:%S'),
+        'fecha_hora': timezone.localtime(evento.fecha_hora).strftime('%Y-%m-%d %H:%M:%S'),
         'observacion': evento.observacion,
     }})
 
@@ -387,7 +388,7 @@ def api_estado(request):
     return JsonResponse({
         'cuadrilla_activa': {'id': cuadrilla_activa_obj.id, 'numero': cuadrilla_activa_obj.numero,
                               'cuadrilla': cuadrilla_activa_obj.cuadrilla} if cuadrilla_activa_obj else None,
-        'cuadrilla_activa_inicio': inicio_cuadrilla_dt.strftime('%Y-%m-%d %H:%M:%S') if cuadrilla_activa_obj and inicio_cuadrilla_dt else None,
+        'cuadrilla_activa_inicio': timezone.localtime(inicio_cuadrilla_dt).strftime('%Y-%m-%d %H:%M:%S') if cuadrilla_activa_obj and inicio_cuadrilla_dt else None,
         'homenaje_activo': {'id': homenaje_activo_obj.id, 'nombre': homenaje_activo_obj.nombre} if homenaje_activo_obj else None,
         'metros_recorridos': metros_recorridos,
         'metros_totales': metros_totales,
@@ -409,7 +410,7 @@ def api_eventos_recientes(request):
     rid = request.GET.get('rid')
     eventos = Evento.objects.filter(recorrido_id=rid).order_by('fecha_hora')[:15]
     return JsonResponse([{
-        'fecha_hora': e.fecha_hora.strftime('%Y-%m-%d %H:%M:%S'),
+        'fecha_hora': timezone.localtime(e.fecha_hora).strftime('%Y-%m-%d %H:%M:%S'),
         'tipo': e.tipo, 'usuario': e.usuario, 'observacion': e.observacion,
     } for e in eventos], safe=False)
 
@@ -609,8 +610,8 @@ def reporte_marcaciones(request):
             diferencia = (duracion - estimado) if (duracion is not None and estimado) else None
             registros.append({
                 'tipo': tipo,
-                'hora_inicio': inicio_e.fecha_hora.strftime('%H:%M') if inicio_e else '–',
-                'hora_fin': e.fecha_hora.strftime('%H:%M'),
+                'hora_inicio': timezone.localtime(inicio_e.fecha_hora).strftime('%H:%M') if inicio_e else '–',
+                'hora_fin': timezone.localtime(e.fecha_hora).strftime('%H:%M'),
                 'duracion': duracion, 'ref_id': ref_id, 'ref_nombre': ref_name,
                 'usuario': e.usuario, 'observacion': e.observacion,
                 'sector_numero': sector_num, 'cua_nombre': cua_nombre, 'cua_numero': cua_numero,
@@ -618,7 +619,7 @@ def reporte_marcaciones(request):
             })
         elif tipo == 'observacion':
             registros.append({
-                'tipo': 'observacion', 'hora_inicio': e.fecha_hora.strftime('%H:%M'),
+                'tipo': 'observacion', 'hora_inicio': timezone.localtime(e.fecha_hora).strftime('%H:%M'),
                 'hora_fin': None, 'duracion': None, 'ref_id': None, 'ref_nombre': '',
                 'usuario': e.usuario, 'observacion': e.observacion,
             })
@@ -628,7 +629,7 @@ def reporte_marcaciones(request):
             if ref_id in cua_idx:
                 ref_name = f'#{cua_idx[ref_id].numero} — {cua_idx[ref_id].cuadrilla}'
             registros.append({
-                'tipo': 'pausa_sector', 'hora_inicio': e.fecha_hora.strftime('%H:%M'),
+                'tipo': 'pausa_sector', 'hora_inicio': timezone.localtime(e.fecha_hora).strftime('%H:%M'),
                 'hora_fin': None, 'duracion': None, 'ref_id': ref_id, 'ref_nombre': ref_name,
                 'usuario': e.usuario, 'observacion': e.observacion,
             })
