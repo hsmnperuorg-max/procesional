@@ -206,8 +206,7 @@ tr:last-child td { border-bottom: none; }
   --tp-select-text:   #2d0a3d;
   --tp-accent-bg:     rgba(212,175,55,0.15);
   --tp-accent-border: rgba(212,175,55,0.5);
-  --tp-accent-strong: rgba(212,175,55,0.3);
-  --tp-accent-border-strong: rgba(212,175,55,0.7);
+  position: relative;
   background: var(--tp-bg); min-height: 100vh; padding: 20px;
 }
 .tablet-page.tema-claro {
@@ -224,15 +223,36 @@ tr:last-child td { border-bottom: none; }
   --tp-select-text:   #2d0a3d;
   --tp-accent-bg:     rgba(212,175,55,0.28);
   --tp-accent-border: rgba(154,116,15,0.6);
-  --tp-accent-strong: rgba(154,116,15,0.35);
-  --tp-accent-border-strong: rgba(154,116,15,0.85);
 }
 .tablet-theme-toggle {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin: 0 auto 16px; padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--tp-accent-border);
-  background: var(--tp-panel-bg); color: var(--tp-fg); font-size: 12px; font-weight: 700;
-  cursor: pointer; width: fit-content;
+  position: absolute; top: 16px; left: 16px; z-index: 5;
+  display: flex; align-items: center; gap: 8px;
+  color: var(--tp-fg); font-size: 12px; font-weight: 700;
 }
+
+/* Switch estilo ON/OFF */
+.switch { position: relative; display: inline-block; width: 60px; height: 30px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider {
+  position: absolute; inset: 0; cursor: pointer;
+  background: #b0b0b0; border-radius: 999px; transition: background 0.2s;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.25);
+}
+.switch .slider::before {
+  content: ""; position: absolute; height: 24px; width: 24px; left: 3px; top: 3px;
+  background: #fff; border-radius: 50%; transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+.switch input:checked + .slider { background: #27ae60; }
+.switch input:checked + .slider::before { transform: translateX(30px); }
+.switch .slider-on, .switch .slider-off {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; color: #fff;
+}
+.switch .slider-on  { left: 8px; opacity: 0; }
+.switch .slider-off { right: 7px; color: rgba(255,255,255,0.85); opacity: 1; }
+.switch input:checked + .slider .slider-on  { opacity: 1; }
+.switch input:checked + .slider .slider-off { opacity: 0; }
 .tablet-header { text-align: center; color: var(--tp-fg); margin-bottom: 24px; }
 .tablet-header h1 { font-size: 22px; font-weight: 700; }
 .tablet-header p { font-size: 13px; color: var(--tp-dim); }

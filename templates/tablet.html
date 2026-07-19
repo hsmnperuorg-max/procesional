@@ -3,19 +3,19 @@
 {% block title %}Tablet de Campo{% endblock %}
 {% block content %}
 <div class="tablet-page" id="tablet-page">
-  <button type="button" class="tablet-theme-toggle" id="theme-toggle" onclick="alternarTema()">
-    <i class="fa fa-sun" id="theme-icon"></i> <span id="theme-label">Modo claro</span>
-  </button>
+  <div class="tablet-theme-toggle">
+    <label class="switch">
+      <input type="checkbox" id="theme-checkbox" onchange="alternarTema()">
+      <span class="slider">
+        <span class="slider-on">ON</span>
+        <span class="slider-off">OFF</span>
+      </span>
+    </label>
+    <span id="theme-label">Modo claro</span>
+  </div>
   <div class="tablet-header">
     <div><img src="{% static 'img/icono_hsmn.png' %}" alt="HSMN" style="height:50px;width:auto;object-fit:contain"></div>
     <h1>Control de Campo</h1>
-    {% if user.rol == 'Super Admin' %}
-    <p style="margin-bottom:4px">
-      <span style="background:var(--tp-accent-strong);border:1px solid var(--tp-accent-border-strong);color:var(--tp-fg);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.5px">
-        ★ ADMINISTRADOR TOTAL
-      </span>
-    </p>
-    {% endif %}
     <p>{{ user.rol }}: {{ user.nombre }}</p>
     <p id="t-recorrido-label" style="font-size:13px;color:var(--tp-fg);opacity:0.9;margin-top:4px;font-weight:600">Sin recorrido seleccionado</p>
   </div>
@@ -147,16 +147,15 @@ const HOMENAJES_ALL  = {{ homenajes_json|tojson }};
 // ── Tema claro/oscuro (visibilidad de día y de noche en campo) ──
 function aplicarTema(tema) {
   const page  = document.getElementById('tablet-page');
-  const icon  = document.getElementById('theme-icon');
+  const check = document.getElementById('theme-checkbox');
   const label = document.getElementById('theme-label');
   const claro = tema === 'claro';
   page.classList.toggle('tema-claro', claro);
-  icon.className = claro ? 'fa fa-moon' : 'fa fa-sun';
+  check.checked = claro;
   label.textContent = claro ? 'Modo oscuro' : 'Modo claro';
 }
 function alternarTema() {
-  const actual = document.getElementById('tablet-page').classList.contains('tema-claro') ? 'claro' : 'oscuro';
-  const nuevo = actual === 'claro' ? 'oscuro' : 'claro';
+  const nuevo = document.getElementById('theme-checkbox').checked ? 'claro' : 'oscuro';
   localStorage.setItem('tablet_tema', nuevo);
   aplicarTema(nuevo);
 }
