@@ -2,19 +2,22 @@
 {% load permisos_extras static %}
 {% block title %}Tablet de Campo{% endblock %}
 {% block content %}
-<div class="tablet-page">
+<div class="tablet-page" id="tablet-page">
+  <button type="button" class="tablet-theme-toggle" id="theme-toggle" onclick="alternarTema()">
+    <i class="fa fa-sun" id="theme-icon"></i> <span id="theme-label">Modo claro</span>
+  </button>
   <div class="tablet-header">
     <div><img src="{% static 'img/icono_hsmn.png' %}" alt="HSMN" style="height:50px;width:auto;object-fit:contain"></div>
     <h1>Control de Campo</h1>
     {% if user.rol == 'Super Admin' %}
     <p style="margin-bottom:4px">
-      <span style="background:rgba(212,175,55,0.3);border:1px solid rgba(212,175,55,0.7);color:#D4AF37;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.5px">
+      <span style="background:var(--tp-accent-strong);border:1px solid var(--tp-accent-border-strong);color:var(--tp-fg);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.5px">
         ★ ADMINISTRADOR TOTAL
       </span>
     </p>
     {% endif %}
     <p>{{ user.rol }}: {{ user.nombre }}</p>
-    <p id="t-recorrido-label" style="font-size:13px;color:rgba(212,175,55,0.9);margin-top:4px;font-weight:600">Sin recorrido seleccionado</p>
+    <p id="t-recorrido-label" style="font-size:13px;color:var(--tp-fg);opacity:0.9;margin-top:4px;font-weight:600">Sin recorrido seleccionado</p>
   </div>
 
   <div class="tablet-status">
@@ -36,12 +39,12 @@
     </div>
   </div>
 
-  <div id="bloque-recorrido" style="background:rgba(212,175,55,0.15);border:2px solid rgba(212,175,55,0.5);border-radius:10px;padding:14px;margin-bottom:16px">
-    <label style="color:var(--dorado,#D4AF37);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px;font-weight:700">
+  <div id="bloque-recorrido" style="background:var(--tp-accent-bg);border:2px solid var(--tp-accent-border);border-radius:10px;padding:14px;margin-bottom:16px">
+    <label style="color:var(--tp-fg);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px;font-weight:700">
       <i class="fa fa-route"></i>&nbsp; Recorrido activo — selecciona antes de registrar
     </label>
     <select id="sel-recorrido-tablet" onchange="cambiarRecorrido(this.value)"
-            style="width:100%;padding:12px;border-radius:8px;border:2px solid rgba(212,175,55,0.6);font-size:14px;background:#fff;font-weight:600;color:#2d0a3d">
+            style="width:100%;padding:12px;border-radius:8px;border:2px solid var(--tp-accent-border);font-size:14px;background:var(--tp-select-bg);font-weight:600;color:var(--tp-select-text)">
       <option value="">-- Elige el recorrido --</option>
       {% for r in recorridos %}
       <option value="{{ r.id }}"
@@ -53,27 +56,27 @@
     </select>
   </div>
 
-  <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px">
-    <label style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar cuadrilla</label>
-    <select id="sel-cuadrilla" onchange="actualizarPanelTiempoCuadrilla()" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:#fff">
+  <div style="background:var(--tp-panel-bg);border-radius:10px;padding:14px;margin-bottom:16px">
+    <label style="color:var(--tp-dim);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar cuadrilla</label>
+    <select id="sel-cuadrilla" onchange="actualizarPanelTiempoCuadrilla()" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:var(--tp-select-bg);color:var(--tp-select-text)">
       <option value="">-- Primero elige un recorrido --</option>
     </select>
   </div>
 
-  <div id="panel-tiempo-cuadrilla" style="display:none;background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
-    <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:10px">
-      <span>Toma: <strong id="pt-toma" style="color:#fff">–</strong></span>
-      <span>Deja: <strong id="pt-deja" style="color:#fff">–</strong></span>
-      <span>Estimado: <strong id="pt-estimado" style="color:#fff">–</strong></span>
+  <div id="panel-tiempo-cuadrilla" style="display:none;background:var(--tp-panel-bg);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--tp-dim);margin-bottom:10px">
+      <span>Toma: <strong id="pt-toma" style="color:var(--tp-value)">–</strong></span>
+      <span>Deja: <strong id="pt-deja" style="color:var(--tp-value)">–</strong></span>
+      <span>Estimado: <strong id="pt-estimado" style="color:var(--tp-value)">–</strong></span>
     </div>
-    <div id="pt-badge" style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;margin-bottom:8px;background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.7)">NO INICIADA</div>
-    <div id="pt-contador" style="font-size:38px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums">00:00</div>
-    <div id="pt-restante-label" style="font-size:13px;color:rgba(255,255,255,0.75);margin-top:4px">Selecciona una cuadrilla para ver su tiempo</div>
+    <div id="pt-badge" style="display:inline-block;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.5px;margin-bottom:8px;background:var(--tp-panel-strong);color:var(--tp-dim)">NO INICIADA</div>
+    <div id="pt-contador" style="font-size:38px;font-weight:800;color:var(--tp-value);font-variant-numeric:tabular-nums">00:00</div>
+    <div id="pt-restante-label" style="font-size:13px;color:var(--tp-dim);margin-top:4px">Selecciona una cuadrilla para ver su tiempo</div>
   </div>
 
-  <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:20px">
-    <label style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar homenaje</label>
-    <select id="sel-homenaje" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:#fff">
+  <div style="background:var(--tp-panel-bg);border-radius:10px;padding:14px;margin-bottom:20px">
+    <label style="color:var(--tp-dim);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar homenaje</label>
+    <select id="sel-homenaje" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:var(--tp-select-bg);color:var(--tp-select-text)">
       <option value="">-- Primero elige un recorrido --</option>
     </select>
   </div>
@@ -111,11 +114,11 @@
     </button>
   </div>
 
-  <div style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
+  <div style="color:var(--tp-dim);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
     <i class="fa fa-clock"></i> Últimos eventos registrados
   </div>
   <div class="log-tablet" id="log-tablet">
-    <div class="log-item"><span style="color:rgba(255,255,255,0.4)">Sin eventos aún en esta sesión</span></div>
+    <div class="log-item"><span style="color:var(--tp-dim2)">Sin eventos aún en esta sesión</span></div>
   </div>
 
   <div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.3)"></div>
@@ -140,6 +143,24 @@
 <script>
 const CUADRILLAS_ALL = {{ cuadrillas_json|tojson }};
 const HOMENAJES_ALL  = {{ homenajes_json|tojson }};
+
+// ── Tema claro/oscuro (visibilidad de día y de noche en campo) ──
+function aplicarTema(tema) {
+  const page  = document.getElementById('tablet-page');
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  const claro = tema === 'claro';
+  page.classList.toggle('tema-claro', claro);
+  icon.className = claro ? 'fa fa-moon' : 'fa fa-sun';
+  label.textContent = claro ? 'Modo oscuro' : 'Modo claro';
+}
+function alternarTema() {
+  const actual = document.getElementById('tablet-page').classList.contains('tema-claro') ? 'claro' : 'oscuro';
+  const nuevo = actual === 'claro' ? 'oscuro' : 'claro';
+  localStorage.setItem('tablet_tema', nuevo);
+  aplicarTema(nuevo);
+}
+aplicarTema(localStorage.getItem('tablet_tema') || 'oscuro');
 
 let gpsLat = null, gpsLng = null;
 let recorridoActivo = '';
