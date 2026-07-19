@@ -1,8 +1,8 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Trazador de Ruta{% endblock %}
 
 {% block content %}
-<!-- Barra de control -->
 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:16px;flex-wrap:wrap">
   <div>
     <h1 style="font-size:20px;font-weight:700;color:var(--morado-oscuro);display:flex;align-items:center;gap:8px">
@@ -30,11 +30,10 @@
     <button onclick="guardar()" class="btn btn-primary" id="btn-guardar" disabled>
       <i class="fa fa-save"></i> Guardar Ruta
     </button>
-    <a href="/recorridos" class="btn btn-outline btn-sm">Volver</a>
+    <a href="{% url 'recorridos' %}" class="btn btn-outline btn-sm">Volver</a>
   </div>
 </div>
 
-<!-- Mapa -->
 <div class="card" style="padding:0;overflow:hidden">
   <div style="padding:8px 16px;background:linear-gradient(90deg,#f0e6fa,#fff);border-bottom:1px solid var(--gris);font-size:13px;display:flex;gap:24px;align-items:center;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:8px">
@@ -56,7 +55,6 @@
   <div id="map-trazo" style="height:630px;cursor:crosshair"></div>
 </div>
 
-<!-- Toast -->
 <div id="toast-trazo" style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
   padding:13px 28px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;
   box-shadow:0 4px 20px rgba(0,0,0,0.3);color:white;pointer-events:none"></div>
@@ -67,22 +65,20 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const RID = '{{ recorrido.id }}';
-const EXISTING_COORDS  = {{ (recorrido.ruta_coords or []) | tojson }};
-const CUADRILLAS_MARKS = {{ cuadrillas | tojson }};
+const EXISTING_COORDS  = {{ recorrido.ruta_coords|tojson }};
+const CUADRILLAS_MARKS = {{ cuadrillas_json|tojson }};
 
-let coords   = [];   // [[lat, lng], ...]
-let dotMarkers = []; // Leaflet circleMarkers para cada punto
+let coords   = [];
+let dotMarkers = [];
 let polyline = null;
 let unsaved  = false;
 
-// ── MAPA ──────────────────────────────────────
 const map = L.map('map-trazo', { zoomControl: true }).setView([-12.0474, -77.0390], 16);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
   maxZoom: 20
 }).addTo(map);
 
-// Referencia: puntos de relevo de cuadrillas ya fijados
 CUADRILLAS_MARKS.forEach(c => {
   if (!c.lat || !c.lng) return;
   L.circleMarker([c.lat, c.lng], {
@@ -90,7 +86,6 @@ CUADRILLAS_MARKS.forEach(c => {
   }).bindTooltip(`<strong>Cuadrilla ${c.numero} – ${c.cuadrilla}</strong><br>Punto de relevo`, { direction: 'top' }).addTo(map);
 });
 
-// Cargar ruta existente
 if (EXISTING_COORDS.length > 0) {
   coords = EXISTING_COORDS.map(p => [p[0], p[1]]);
   renderizarTodo(false);
@@ -99,7 +94,6 @@ if (EXISTING_COORDS.length > 0) {
   actualizarUI();
 }
 
-// ── CLIC PARA AGREGAR PUNTO ────────────────────
 map.on('click', function(e) {
   if (e.originalEvent.ctrlKey) { deshacer(); return; }
 
@@ -107,7 +101,6 @@ map.on('click', function(e) {
   coords.push(p);
   unsaved = true;
 
-  // Redibujar último marcador como "normal" y agregar nuevo resaltado
   if (dotMarkers.length > 0) {
     const prev = dotMarkers[dotMarkers.length - 1];
     prev.setStyle({ fillColor: '#6E1E91', radius: 4 });
@@ -123,7 +116,6 @@ map.on('click', function(e) {
   ocultarGuardado();
 });
 
-// ── FUNCIONES ──────────────────────────────────
 function dibujarLinea() {
   if (polyline) map.removeLayer(polyline);
   polyline = null;
@@ -135,7 +127,6 @@ function dibujarLinea() {
 }
 
 function renderizarTodo(marcarUltimo = true) {
-  // Limpiar
   dotMarkers.forEach(m => map.removeLayer(m));
   dotMarkers = [];
   if (polyline) { map.removeLayer(polyline); polyline = null; }
@@ -161,7 +152,6 @@ function deshacer() {
   const m = dotMarkers.pop();
   if (m) map.removeLayer(m);
 
-  // El nuevo último punto vuelve a ser "verde"
   if (dotMarkers.length > 0) {
     dotMarkers[dotMarkers.length - 1].setStyle({ fillColor: '#27ae60', radius: 7 });
   }
@@ -193,7 +183,7 @@ async function guardar() {
   try {
     const resp = await fetch('/api/ruta/guardar', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
       body: JSON.stringify({ rid: RID, coords })
     });
     const data = await resp.json();
@@ -234,7 +224,6 @@ function mostrarToast(msg, color) {
   t._timer = setTimeout(() => t.style.display = 'none', 3500);
 }
 
-// Aviso al salir sin guardar
 window.addEventListener('beforeunload', e => {
   if (unsaved && coords.length > 0) {
     e.preventDefault(); e.returnValue = '';

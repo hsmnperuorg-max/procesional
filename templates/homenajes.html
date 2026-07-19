@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Homenajes{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -15,7 +16,7 @@
   <div class="card-header">
     <h2><i class="fa fa-list"></i> Homenajes Programados ({{ homenajes|length }})</h2>
     <span style="font-size:13px;color:var(--gris-text)">
-      Tiempo total: <strong>{{ homenajes | sum(attribute='tiempo_programado') }} min</strong>
+      Tiempo total: <strong>{{ total_tiempo }} min</strong>
     </span>
   </div>
   <div class="table-wrap">
@@ -38,19 +39,20 @@
             {% if h.cargo_a == 'institucion' %}<span class="badge badge-morado">Institución</span>
             {% else %}<span class="badge badge-gris">Cuadrilla</span>{% endif %}
           </td>
-          <td style="font-size:12px;color:var(--gris-text)">{{ h.observaciones or '–' }}</td>
+          <td style="font-size:12px;color:var(--gris-text)">{{ h.observaciones|default:'–' }}</td>
           <td style="display:flex;gap:6px">
             <button type="button" class="btn btn-sm btn-outline"
                     data-id="{{ h.id }}"
                     onclick="abrirEditarHom(this)">
               <i class="fa fa-pencil"></i>
             </button>
-            <form method="POST" action="/homenajes/eliminar/{{ h.id }}" onsubmit="return confirm('¿Eliminar este homenaje?')">
+            <form method="POST" action="{% url 'eliminar_homenaje' h.id %}" onsubmit="return confirm('¿Eliminar este homenaje?')">
+              {% csrf_token %}
               <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
             </form>
           </td>
         </tr>
-        {% else %}
+        {% empty %}
         <tr><td colspan="7" style="text-align:center;color:var(--gris-text);padding:40px">No hay homenajes registrados.</td></tr>
         {% endfor %}
       </tbody>
@@ -62,7 +64,8 @@
 <div class="modal-overlay" id="modal-hom">
   <div class="modal">
     <h3><i class="fa fa-church" style="color:var(--morado)"></i> Nuevo Homenaje</h3>
-    <form method="POST" action="/homenajes/nuevo">
+    <form method="POST" action="{% url 'nuevo_homenaje' %}">
+      {% csrf_token %}
       <div class="form-grid">
         <div class="form-group">
           <label>Recorrido</label>
@@ -121,6 +124,7 @@
   <div class="modal">
     <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Homenaje</h3>
     <form method="POST" id="form-edit-hom">
+      {% csrf_token %}
       <div class="form-grid">
         <div class="form-group">
           <label>Recorrido</label>
@@ -177,7 +181,7 @@
 
 {% block scripts %}
 <script>
-const HOMENAJES_DATA = {{ homenajes | tojson }};
+const HOMENAJES_DATA = {{ homenajes_json|tojson }};
 
 function abrirEditarHom(btn) {
   const h = HOMENAJES_DATA.find(x => x.id === btn.dataset.id);

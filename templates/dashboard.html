@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Dashboard Ejecutivo{% endblock %}
 {% block content %}
 
-{% set rec = recorrido_actual %}
+{% with rec=recorrido_actual %}
 
 <!-- Cabecera + Selector compacto -->
 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:20px">
@@ -13,16 +14,13 @@
   </div>
 
   <i class="fa fa-route" style="color:var(--morado);font-size:16px"></i>
-  <select onchange="window.location='/dashboard?rid='+this.value"
+  <select onchange="window.location='{% url 'dashboard' %}?rid='+this.value"
           style="padding:8px 16px;border-radius:8px;border:2px solid var(--morado);
                  font-size:13px;color:var(--morado-oscuro);background:white;
                  cursor:pointer;min-width:280px;max-width:400px">
     {% for r in recorridos %}
-    {% if r.fecha == hoy %}{% set ico = '🟢' %}
-    {% elif r.fecha < hoy %}{% set ico = '📋' %}
-    {% else %}{% set ico = '📅' %}{% endif %}
     <option value="{{ r.id }}" {% if r.id == rid %}selected{% endif %}>
-      {{ ico }} {{ r.nombre }} · {{ r.fecha }}
+      {% if r.fecha == hoy %}🟢{% elif r.fecha < hoy %}📋{% else %}📅{% endif %} {{ r.nombre }} · {{ r.fecha }}
     </option>
     {% endfor %}
   </select>
@@ -65,8 +63,8 @@
   </div>
   <div class="kpi-card azul">
     <div class="kpi-label">ETA Llegada</div>
-    <div class="kpi-value" id="kpi-eta">{{ rec.hora_llegada_programada if rec else '–' }}</div>
-    <div class="kpi-sub" id="kpi-eta-sub">Hora programada: {{ rec.hora_llegada_programada if rec else '–' }}</div>
+    <div class="kpi-value" id="kpi-eta">{% if rec %}{{ rec.hora_llegada_programada|time:'H:i' }}{% else %}–{% endif %}</div>
+    <div class="kpi-sub" id="kpi-eta-sub">Hora programada: {% if rec %}{{ rec.hora_llegada_programada|time:'H:i' }}{% else %}–{% endif %}</div>
   </div>
   <div class="kpi-card naranja">
     <div class="kpi-label">Cuadrillas Completas</div>
@@ -119,7 +117,7 @@
           {% for c in cuadrillas %}
           <tr id="row-{{ c.id }}">
             <td><strong>{{ c.numero }}</strong></td>
-            <td style="font-size:12px">{{ c.cuadrilla | truncate(26) }}</td>
+            <td style="font-size:12px">{{ c.cuadrilla|truncatechars:26 }}</td>
             <td>{{ c.tiempo_estimado }}m</td>
             <td id="real-{{ c.id }}">–</td>
             <td id="dif-{{ c.id }}">–</td>
@@ -169,14 +167,14 @@
       <tbody id="tabla-homenajes">
         {% for h in homenajes %}
         <tr id="hrow-{{ h.id }}">
-          <td style="font-size:12px;font-weight:600">{{ h.nombre | truncate(40) }}</td>
-          <td style="font-size:11px;color:var(--gris-text)">{{ h.ubicacion or '–' }}</td>
+          <td style="font-size:12px;font-weight:600">{{ h.nombre|truncatechars:40 }}</td>
+          <td style="font-size:11px;color:var(--gris-text)">{{ h.ubicacion|default:'–' }}</td>
           <td>{{ h.tiempo_programado }}m</td>
           <td id="hreal-{{ h.id }}">–</td>
           <td id="hdif-{{ h.id }}">–</td>
           <td id="hest-{{ h.id }}"><span class="badge badge-gris">Pendiente</span></td>
         </tr>
-        {% else %}
+        {% empty %}
         <tr><td colspan="6" style="text-align:center;color:#ccc;padding:20px;font-size:13px">Sin homenajes registrados para este recorrido</td></tr>
         {% endfor %}
       </tbody>
@@ -192,9 +190,11 @@
   <div id="lista-alertas"></div>
 </div>
 
+{% endwith %}
 {% endblock %}
 
 {% block scripts %}
+{% load permisos_extras %}
 <script>
 const RID = '{{ rid }}';
 
@@ -219,15 +219,8 @@ const TIPOS = {
   observacion:      '📝 Observación',
 };
 
-const CUADRILLAS = {};
-{% for c in cuadrillas %}
-  CUADRILLAS['{{ c.id }}'] = { numero: {{ c.numero }}, nombre: '{{ c.cuadrilla | replace("'", "\\'") }}', estimado: {{ c.tiempo_estimado }} };
-{% endfor %}
-
-const HOMENAJES = {};
-{% for h in homenajes %}
-  HOMENAJES['{{ h.id }}'] = { nombre: '{{ h.nombre | replace("'", "\\'") }}', estimado: {{ h.tiempo_programado }} };
-{% endfor %}
+const CUADRILLAS = {{ cuadrillas_map|tojson }};
+const HOMENAJES = {{ homenajes_map|tojson }};
 
 // Polling cada 3 segundos
 async function actualizarDashboard() {
@@ -241,7 +234,7 @@ async function actualizarDashboard() {
     const nCua = estado.cuadrilla_activa ? estado.cuadrilla_activa.numero : '–';
     document.getElementById('kpi-cuadrilla').textContent = nCua !== '–' ? '#' + nCua : '–';
     document.getElementById('kpi-cuadrilla-nombre').textContent =
-      estado.cuadrilla_activa ? (estado.cuadrilla_activa.cuadrilla || estado.cuadrilla_activa.nombre || '') : 'Sin cuadrilla activa';
+      estado.cuadrilla_activa ? (estado.cuadrilla_activa.cuadrilla || '') : 'Sin cuadrilla activa';
 
     document.getElementById('kpi-metros').textContent = estado.metros_recorridos.toLocaleString();
     document.getElementById('kpi-metros-pct').textContent = `de ${estado.metros_totales.toLocaleString()} m · ${estado.porcentaje}%`;
@@ -310,14 +303,12 @@ async function actualizarDashboard() {
       });
     }
 
-    // Homenaje activo en tabla
     if (estado.homenaje_activo) {
       const id = estado.homenaje_activo.id;
       const estEl = document.getElementById(`hest-${id}`);
       if (estEl) estEl.innerHTML = `<span class="badge badge-morado"><span class="status-dot dot-verde"></span>Activo</span>`;
     }
 
-    // Cuadrilla activa en tabla
     if (estado.cuadrilla_activa) {
       const id = estado.cuadrilla_activa.id;
       const estEl = document.getElementById(`est-${id}`);
@@ -361,7 +352,7 @@ setInterval(actualizarDashboard, 3000);
 
 async function resetDemo() {
   if (!confirm('¿Reiniciar todos los eventos de demostración?')) return;
-  await fetch('/api/reset', { method: 'POST' });
+  await fetch('/api/reset', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
   actualizarDashboard();
 }
 </script>

@@ -5,7 +5,7 @@
 <div class="page-header">
   <div>
     <h1><i class="fa fa-map-location-dot" style="color:var(--morado)"></i> Seguimiento en Tiempo Real</h1>
-    <p id="sub-nombre">{{ recorrido.nombre if recorrido else '–' }}</p>
+    <p id="sub-nombre">{% if recorrido %}{{ recorrido.nombre }}{% else %}–{% endif %}</p>
   </div>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
     <select id="sel-recorrido" onchange="cambiarRecorrido(this.value)"
@@ -18,7 +18,6 @@
   </div>
 </div>
 
-<!-- Barra de progreso -->
 <div class="card" style="padding:16px 24px;margin-bottom:16px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
     <div>
@@ -49,10 +48,8 @@
   </div>
 </div>
 
-<!-- Mapa + checkpoints -->
 <div class="mapa-layout">
 
-  <!-- Mapa -->
   <div class="card" style="padding:0;overflow:hidden">
     <div id="map" style="height:560px"></div>
     <div style="display:flex;gap:20px;padding:10px 16px;background:#fafafa;border-top:1px solid var(--gris);font-size:12px;flex-wrap:wrap">
@@ -77,10 +74,8 @@
     </div>
   </div>
 
-  <!-- Panel de cuadrillas -->
   <div style="display:flex;flex-direction:column;gap:12px">
 
-    <!-- Info cuadrilla activa -->
     <div class="card" id="card-activa" style="padding:16px;display:none">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--gris-text);margin-bottom:6px">
         <span class="status-dot dot-verde"></span> Cuadrilla en curso
@@ -88,24 +83,21 @@
       <div id="activa-nombre" style="font-size:16px;font-weight:700;color:var(--morado-oscuro)">—</div>
     </div>
 
-    <!-- Aviso sin ruta trazada -->
     <div class="card" id="card-sin-ruta" style="padding:16px;display:none;border-left:4px solid var(--naranja)">
       <div style="font-size:13px;color:var(--naranja);font-weight:600"><i class="fa fa-triangle-exclamation"></i> Sin ruta trazada</div>
       <div style="font-size:12px;color:var(--gris-text);margin-top:4px">
         Este recorrido no tiene ruta trazada aún.<br>
-        Ve a <a href="/recorridos" style="color:var(--morado)">Recorridos</a> y usa <strong>Trazar ruta</strong>.
+        Ve a <a href="{% url 'recorridos' %}" style="color:var(--morado)">Recorridos</a> y usa <strong>Trazar ruta</strong>.
       </div>
     </div>
-    <!-- Aviso sin puntos de relevo -->
     <div class="card" id="card-sin-puntos" style="padding:16px;display:none;border-left:4px solid #bbb">
       <div style="font-size:13px;color:#888;font-weight:600"><i class="fa fa-map-pin"></i> Sin puntos de relevo</div>
       <div style="font-size:12px;color:var(--gris-text);margin-top:4px">
         Ninguna cuadrilla tiene punto fijado en mapa.<br>
-        Ve a <a href="/cuadrillas" style="color:var(--morado)">Cuadrillas</a> y usa "Fijar en mapa" en cada una.
+        Ve a <a href="{% url 'cuadrillas' %}" style="color:var(--morado)">Cuadrillas</a> y usa "Fijar en mapa" en cada una.
       </div>
     </div>
 
-    <!-- Lista de cuadrillas con estado -->
     <div class="card" style="padding:0;overflow:hidden">
       <div style="padding:12px 16px;background:var(--morado-oscuro)">
         <div style="font-size:13px;font-weight:600;color:white"><i class="fa fa-list-check"></i> Cuadrillas del Recorrido</div>
@@ -135,7 +127,7 @@
   .cp-num.pendiente{ background:#e0e0e0;color:#999; }
 </style>
 <script>
-let RID = '{{ recorrido.id if recorrido else "rec-001" }}';
+let RID = '{% if recorrido %}{{ recorrido.id }}{% else %}{% endif %}';
 let map, allLayers = [], lastWP = -99;
 
 map = L.map('map').setView([-12.0474, -77.0390], 15);
@@ -149,6 +141,7 @@ function clearLayers() {
 }
 
 async function actualizarMapa() {
+  if (!RID) return;
   try {
     const resp = await fetch(`/api/posicion_mapa?rid=${RID}`);
     const data = await resp.json();
@@ -163,11 +156,9 @@ async function actualizarMapa() {
     const tieneRuta   = data.tiene_ruta;
     const conPunto    = segments.filter(s => s.lat).length;
 
-    // Avisos de estado
     document.getElementById('card-sin-ruta').style.display    = !tieneRuta ? 'block' : 'none';
     document.getElementById('card-sin-puntos').style.display  = (tieneRuta && conPunto === 0) ? 'block' : 'none';
 
-    // Sin cambio → no redibujar
     const clave = `${fillIndex}-${ruta.length}-${activaId}-${nComp}`;
     if (clave === lastWP) return;
     const primeraCarga = lastWP === -99;
@@ -176,20 +167,17 @@ async function actualizarMapa() {
     clearLayers();
 
     if (tieneRuta && ruta.length > 1) {
-      // Ruta completa (dorado punteado)
       const fullLine = L.polyline(ruta, {
         color: '#D4AF37', weight: 5, opacity: 0.45, dashArray: '10, 6'
       }).addTo(map);
       allLayers.push(fullLine);
 
-      // Tramo recorrido (morado sólido) — sigue exactamente las calles dibujadas
       if (fillIndex > 0) {
         const doneLine = L.polyline(ruta.slice(0, fillIndex + 1), {
           color: '#6E1E91', weight: 8, opacity: 0.95, lineJoin: 'round', lineCap: 'round'
         }).addTo(map);
         allLayers.push(doneLine);
 
-        // Marcador en la punta del avance — ícono del Señor
         const posPt = ruta[fillIndex];
         const iconSenor = L.divIcon({
           html: `<img src="/static/img/senor.png"
@@ -209,7 +197,6 @@ async function actualizarMapa() {
       if (primeraCarga) map.fitBounds(L.latLngBounds(ruta), { padding: [30, 30] });
     }
 
-    // Marcadores de cuadrillas (puntos de relevo) — solo las que tienen lat/lng
     segments.filter(s => s.lat && s.lng).forEach(s => {
       const esActiva = s.id === activaId;
       const cm = L.circleMarker([s.lat, s.lng], {
@@ -222,7 +209,6 @@ async function actualizarMapa() {
       allLayers.push(cm);
     });
 
-    // UI – progreso
     const pct = total > 0 ? Math.round(nComp / total * 100) : 0;
     document.getElementById('mapa-progress').style.width = pct + '%';
     const barIcon = document.getElementById('senor-mapa-bar');
@@ -233,7 +219,6 @@ async function actualizarMapa() {
     document.getElementById('lbl-inicio').textContent = 'Inicio del recorrido';
     document.getElementById('lbl-fin').textContent    = 'Llegada';
 
-    // Card cuadrilla activa
     const cardActiva = document.getElementById('card-activa');
     if (activaNombre) {
       document.getElementById('activa-nombre').textContent = activaNombre;
@@ -242,7 +227,6 @@ async function actualizarMapa() {
       cardActiva.style.display = 'none';
     }
 
-    // Lista completa de cuadrillas (todas, con o sin punto en mapa)
     const lista = document.getElementById('lista-checkpoints');
     if (segments.length === 0) {
       lista.innerHTML = '<div style="padding:16px;text-align:center;color:#ccc;font-size:13px">Sin cuadrillas registradas</div>';
@@ -272,7 +256,6 @@ async function actualizarMapa() {
 function cambiarRecorrido(rid) {
   RID = rid;
   lastWP = -99;
-  lastTotal = 0;
   clearLayers();
   actualizarMapa();
 }

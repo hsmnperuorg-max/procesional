@@ -6,10 +6,11 @@
     <h1><i class="fa fa-plus" style="color:var(--morado)"></i> Nuevo Recorrido Procesional</h1>
     <p>Complete los datos del recorrido</p>
   </div>
-  <a href="/recorridos" class="btn btn-outline"><i class="fa fa-arrow-left"></i> Volver</a>
+  <a href="{% url 'recorridos' %}" class="btn btn-outline"><i class="fa fa-arrow-left"></i> Volver</a>
 </div>
 <div class="card" style="max-width:720px">
-  <form method="POST" action="/recorridos/nuevo">
+  <form method="POST" action="{% url 'nuevo_recorrido' %}">
+    {% csrf_token %}
     <div class="form-grid">
       <div class="form-group" style="grid-column:1/-1">
         <label>Nombre del Recorrido</label>
@@ -38,7 +39,7 @@
     </div>
     <div class="form-actions" style="margin-top:20px">
       <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Guardar Recorrido</button>
-      <a href="/recorridos" class="btn btn-outline">Cancelar</a>
+      <a href="{% url 'recorridos' %}" class="btn btn-outline">Cancelar</a>
     </div>
   </form>
 </div>

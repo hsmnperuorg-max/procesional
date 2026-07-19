@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% set es_admin = usuario.rol in ['Administrador General', 'Super Admin'] %}
+{% load permisos_extras humanize %}
 {% block title %}Recorridos Procesionales{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -7,8 +7,8 @@
     <h1><i class="fa fa-route" style="color:var(--morado)"></i> Recorridos Procesionales</h1>
     <p>Administración de los recorridos del Señor de los Milagros</p>
   </div>
-  {% if es_admin %}
-  <a href="/recorridos/nuevo" class="btn btn-primary"><i class="fa fa-plus"></i> Nuevo Recorrido</a>
+  {% if user.rol == 'Super Admin' %}
+  <a href="{% url 'nuevo_recorrido' %}" class="btn btn-primary"><i class="fa fa-plus"></i> Nuevo Recorrido</a>
   {% endif %}
 </div>
 
@@ -31,9 +31,9 @@
             {% if r.observaciones %}<div style="font-size:12px;color:var(--gris-text)">{{ r.observaciones }}</div>{% endif %}
           </td>
           <td>{{ r.fecha }}</td>
-          <td><strong>{{ r.hora_salida }}</strong></td>
-          <td>{{ r.hora_llegada_programada }}</td>
-          <td>{{ "{:,}".format(r.distancia_total) }} m</td>
+          <td><strong>{{ r.hora_salida|time:'H:i' }}</strong></td>
+          <td>{{ r.hora_llegada_programada|time:'H:i' }}</td>
+          <td>{{ r.distancia_total|intcomma }} m</td>
           <td>
             {% if r.estado == 'programado' %}<span class="badge badge-morado">Programado</span>
             {% elif r.estado == 'en_curso' %}<span class="badge badge-verde"><span class="status-dot dot-verde"></span>En curso</span>
@@ -41,13 +41,13 @@
             {% else %}<span class="badge badge-gris">{{ r.estado }}</span>{% endif %}
           </td>
           <td style="display:flex;gap:6px;flex-wrap:wrap">
-            <a href="/dashboard" class="btn btn-sm btn-primary"><i class="fa fa-gauge"></i> Dashboard</a>
-            <a href="/recorridos/trazar/{{ r.id }}" class="btn btn-sm"
+            <a href="{% url 'dashboard' %}?rid={{ r.id }}" class="btn btn-sm btn-primary"><i class="fa fa-gauge"></i> Dashboard</a>
+            <a href="{% url 'trazar_recorrido' r.id %}" class="btn btn-sm"
                style="background:{% if r.ruta_coords %}var(--verde){% else %}var(--naranja){% endif %};color:white"
                title="{% if r.ruta_coords %}Editar ruta trazada ({{ r.ruta_coords|length }} pts){% else %}Trazar ruta en el mapa{% endif %}">
               <i class="fa fa-route"></i> {% if r.ruta_coords %}Editar ruta{% else %}Trazar ruta{% endif %}
             </a>
-            <a href="/reporte/toma-y-deja/{{ r.id }}" class="btn btn-sm"
+            <a href="{% url 'reporte_toma_y_deja' r.id %}" class="btn btn-sm"
                style="background:#8e24aa;color:white" title="Exportar Toma y Deja" target="_blank">
               <i class="fa fa-file-export"></i> Toma y Deja
             </a>
@@ -56,12 +56,12 @@
                     onclick="abrirEditarRec(this)">
               <i class="fa fa-pencil"></i>
             </button>
-            {% if es_admin %}
+            {% if user.rol == 'Super Admin' %}
             <button type="button" class="btn btn-sm btn-danger"
                     data-rid="{{ r.id }}"
                     data-nombre="{{ r.nombre }}"
-                    data-cuas="{{ cuas_por_rec.get(r.id, 0) }}"
-                    data-homs="{{ homs_por_rec.get(r.id, 0) }}"
+                    data-cuas="{{ r.n_cuadrillas }}"
+                    data-homs="{{ r.n_homenajes }}"
                     onclick="confirmarEliminar(this)"
                     title="Eliminar recorrido (solo administrador)">
               <i class="fa fa-trash"></i>
@@ -69,7 +69,7 @@
             {% endif %}
           </td>
         </tr>
-        {% else %}
+        {% empty %}
         <tr><td colspan="7" style="text-align:center;color:var(--gris-text);padding:40px">No hay recorridos registrados aún.</td></tr>
         {% endfor %}
       </tbody>
@@ -78,7 +78,7 @@
 </div>
 
 <!-- Modal CONFIRMAR ELIMINAR (solo admin) -->
-{% if es_admin %}
+{% if user.rol == 'Super Admin' %}
 <div class="modal-overlay" id="modal-del-rec">
   <div class="modal" style="max-width:480px">
     <div style="text-align:center;margin-bottom:16px">
@@ -104,6 +104,7 @@
     </div>
 
     <form method="POST" id="form-del-rec">
+      {% csrf_token %}
       <div style="display:flex;gap:10px;justify-content:center">
         <button type="submit" class="btn btn-danger" style="padding:10px 24px;font-size:14px">
           <i class="fa fa-trash"></i>&nbsp; Sí, eliminar todo
@@ -123,6 +124,7 @@
   <div class="modal" style="max-width:580px">
     <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Recorrido</h3>
     <form method="POST" id="form-edit-rec">
+      {% csrf_token %}
       <div class="form-grid">
         <div class="form-group" style="grid-column:1/-1">
           <label>Nombre del Recorrido</label>
@@ -180,8 +182,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if es_admin %}
-<!-- Script de eliminación en bloque separado — no depende de RECORRIDOS_DATA -->
+{% if user.rol == 'Super Admin' %}
 <script>
 function confirmarEliminar(btn) {
   const id    = btn.dataset.rid;
@@ -202,9 +203,8 @@ document.getElementById('modal-del-rec').addEventListener('click', function(e) {
 </script>
 {% endif %}
 
-<!-- Script principal con datos de recorridos (sin ruta_coords) -->
 <script>
-const RECORRIDOS_DATA = {{ recorridos_js | tojson }};
+const RECORRIDOS_DATA = {{ recorridos_js|tojson }};
 
 function abrirEditarRec(btn) {
   const r = RECORRIDOS_DATA.find(x => x.id === btn.dataset.id);

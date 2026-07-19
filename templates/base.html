@@ -1,15 +1,15 @@
-<!DOCTYPE html>
+{% load static permisos_extras %}<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Sistema Procesional{% endblock %} – Señor de los Milagros</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+<link rel="stylesheet" href="{% static 'css/main.css' %}">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
 
-{% if session.usuario %}
+{% if user.is_authenticated %}
 <header class="topbar">
   <button class="nav-toggle" id="navToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="sidebarMenu">
     <i class="fa fa-bars"></i>
@@ -22,55 +22,65 @@
     </div>
   </div>
   <div class="nav-user">
-    <span class="nav-user-name"><i class="fa fa-user-circle"></i> {{ session.usuario.nombre }}</span>
-    <span class="rol-badge">{{ session.usuario.rol }}</span>
-    <a href="/logout" class="btn-logout"><i class="fa fa-right-from-bracket"></i> <span class="btn-logout-text">Salir</span></a>
+    <span class="nav-user-name"><i class="fa fa-user-circle"></i> {{ user.nombre }}</span>
+    <span class="rol-badge">{{ user.rol }}</span>
+    <a href="{% url 'logout' %}" class="btn-logout"><i class="fa fa-right-from-bracket"></i> <span class="btn-logout-text">Salir</span></a>
   </div>
 </header>
 
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <nav class="sidebar" id="sidebarMenu">
   <ul class="nav-links">
-    {% if tiene_acceso(session.usuario.rol, 'dashboard') %}
-    <li><a href="/dashboard" class="{% if request.path == '/dashboard' %}active{% endif %}"><i class="fa fa-gauge"></i> Dashboard</a></li>
+    {% if user.rol|tiene_acceso:'dashboard' %}
+    <li><a href="{% url 'dashboard' %}" class="{% if request.path == '/dashboard' %}active{% endif %}"><i class="fa fa-gauge"></i> Dashboard</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'recorridos') %}
-    <li><a href="/recorridos" class="{% if '/recorridos' in request.path %}active{% endif %}"><i class="fa fa-route"></i> Recorridos</a></li>
+    {% if user.rol|tiene_acceso:'recorridos' %}
+    <li><a href="{% url 'recorridos' %}" class="{% if '/recorridos' in request.path %}active{% endif %}"><i class="fa fa-route"></i> Recorridos</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'cuadrillas') %}
-    <li><a href="/cuadrillas" class="{% if '/cuadrillas' in request.path %}active{% endif %}"><i class="fa fa-people-group"></i> Cuadrillas</a></li>
+    {% if user.rol|tiene_acceso:'cuadrillas' %}
+    <li><a href="{% url 'cuadrillas' %}" class="{% if '/cuadrillas' in request.path %}active{% endif %}"><i class="fa fa-people-group"></i> Cuadrillas</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'homenajes') %}
-    <li><a href="/homenajes" class="{% if '/homenajes' in request.path %}active{% endif %}"><i class="fa fa-church"></i> Homenajes</a></li>
+    {% if user.rol|tiene_acceso:'homenajes' %}
+    <li><a href="{% url 'homenajes' %}" class="{% if '/homenajes' in request.path %}active{% endif %}"><i class="fa fa-church"></i> Homenajes</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'mapa') %}
-    <li><a href="/mapa" class="{% if '/mapa' in request.path %}active{% endif %}"><i class="fa fa-map-location-dot"></i> Mapa</a></li>
+    {% if user.rol|tiene_acceso:'mapa' %}
+    <li><a href="{% url 'mapa_view' %}" class="{% if '/mapa' in request.path %}active{% endif %}"><i class="fa fa-map-location-dot"></i> Mapa</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'reportes') %}
-    <li><a href="/reporte/marcaciones" class="{% if '/reporte' in request.path %}active{% endif %}"><i class="fa fa-file-lines"></i> Reportes</a></li>
+    {% if user.rol|tiene_acceso:'reportes' %}
+    <li><a href="{% url 'reporte_marcaciones' %}" class="{% if '/reporte' in request.path %}active{% endif %}"><i class="fa fa-file-lines"></i> Reportes</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'tablet') %}
-    <li><a href="/tablet" class="nav-tablet {% if '/tablet' in request.path %}active{% endif %}"><i class="fa fa-tablet"></i> Tablet Campo</a></li>
+    {% if user.rol|tiene_acceso:'tablet' %}
+    <li><a href="{% url 'tablet' %}" class="nav-tablet {% if '/tablet' in request.path %}active{% endif %}"><i class="fa fa-tablet"></i> Tablet Campo</a></li>
     {% endif %}
-    {% if tiene_acceso(session.usuario.rol, 'usuarios') %}
-    <li><a href="/usuarios" class="{% if '/usuarios' in request.path %}active{% endif %}"><i class="fa fa-users-gear"></i> Usuarios</a></li>
+    {% if user.rol|tiene_acceso:'usuarios' %}
+    <li><a href="{% url 'usuarios' %}" class="{% if '/usuarios' in request.path %}active{% endif %}"><i class="fa fa-users-gear"></i> Usuarios</a></li>
+    {% endif %}
+    {% if user.rol|tiene_acceso:'auditoria' %}
+    <li><a href="{% url 'auditoria' %}" class="{% if '/auditoria' in request.path %}active{% endif %}"><i class="fa fa-shield-halved"></i> Auditoría</a></li>
     {% endif %}
   </ul>
 </nav>
 {% endif %}
 
-<main class="main-content {% if not session.usuario %}full{% endif %}">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for cat, msg in messages %}
-        <div class="alert alert-{{ cat }}">{{ msg }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+<main class="main-content {% if not user.is_authenticated %}full{% endif %}">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
   {% block content %}{% endblock %}
 </main>
 
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+<script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+const CSRF_TOKEN = getCookie('csrftoken');
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -3,77 +3,100 @@
 Sistema integral para planificar, registrar y monitorear en tiempo real
 los recorridos procesionales de la Hermandad del Señor de los Milagros de Nazarenas.
 
+Construido en **Django** + **PostgreSQL**, listo para desplegarse en **Render** o en
+cualquier **VPS** con Docker.
+
 ---
 
 ## REQUISITOS
 
-- Python 3.8 o superior
-- VS Code (recomendado)
-- Conexión a internet (solo para íconos Font Awesome)
+- Python 3.11+ (probado con 3.13)
+- PostgreSQL (local, Docker, o un proveedor externo como Neon)
+- Conexión a internet (Font Awesome y Leaflet se cargan desde CDN)
 
 ---
 
-## INSTALACIÓN PASO A PASO
+## INSTALACIÓN LOCAL (sin Docker)
 
-### 1. Abrir VS Code en esta carpeta
-Abre VS Code y luego: Archivo → Abrir Carpeta → selecciona esta carpeta.
-
-### 2. Abrir la Terminal en VS Code
-Menú → Terminal → Nueva Terminal
-
-### 3. Instalar Flask
+### 1. Crear entorno virtual e instalar dependencias
 ```
-pip install flask
+python -m venv venv
+venv\Scripts\activate          (Windows)
+pip install -r requirements.txt
+```
+
+### 2. Configurar variables de entorno
+Copiar `.env.example` a `.env` y completar `DATABASE_URL` con tu Postgres local
+(`DB_SSLMODE=disable` si tu Postgres local no usa SSL).
+
+### 3. Migrar la base de datos (crea también los datos de demo)
+```
+python manage.py migrate
 ```
 
 ### 4. Ejecutar la aplicación
 ```
-python app.py
+python manage.py runserver
 ```
 
 ### 5. Abrir en el navegador
 ```
-http://localhost:5000
+http://localhost:8000
 ```
+
+---
+
+## INSTALACIÓN CON DOCKER (VPS propio)
+
+```
+cp .env.example .env   # completar DB_NAME / DB_USER / DB_PASSWORD y SECRET_KEY
+docker compose up --build
+```
+
+Esto levanta 3 contenedores: `db` (Postgres), `web` (Django + gunicorn) y `nginx`
+(proxy inverso en el puerto 80). Las migraciones y `collectstatic` corren
+automáticamente al iniciar el contenedor `web` (ver `entrypoint.sh`).
+
+---
+
+## DESPLIEGUE EN RENDER
+
+El repo incluye `render.yaml` (blueprint) y el mismo `Dockerfile` usado para el VPS.
+En Render: New → Blueprint → seleccionar este repo. Completar manualmente en el
+dashboard las variables marcadas `sync: false` (`DATABASE_URL` de tu Postgres,
+por ejemplo Neon, con `sslmode=require`).
 
 ---
 
 ## USUARIOS DE PRUEBA
 
+Se crean automáticamente al correr `migrate` (contraseñas ya hasheadas en la base):
+
 | Usuario      | Contraseña | Rol                    |
 |--------------|------------|------------------------|
-| admin        | admin123   | Administrador General  |
+| admin        | admin123   | Super Admin            |
 | cronometro1  | cron123    | Cronometrista          |
-| director     | dir123     | Director de Recorrido  |
+| secretario1  | sec123     | Pro Secretario         |
+| mayordomo1   | mayor123   | Mayordomía             |
+
+**Cambiar estas contraseñas antes de usar el sistema en producción real.**
 
 ---
 
 ## MÓDULOS DEL SISTEMA
 
-| Ruta         | Descripción                                      |
-|--------------|--------------------------------------------------|
-| /login       | Inicio de sesión                                 |
-| /dashboard   | Centro de control ejecutivo en tiempo real       |
-| /recorridos  | Gestión de recorridos procesionales              |
-| /cuadrillas  | Configuración de cuadrillas y tiempos            |
-| /homenajes   | Gestión de homenajes programados                 |
-| /tablet      | Interfaz de campo para cronometristas            |
-
----
-
-## CÓMO HACER UNA DEMO EN VIVO
-
-1. Abre dos pestañas del navegador:
-   - Pestaña 1: http://localhost:5000/dashboard (dashboard ejecutivo)
-   - Pestaña 2: http://localhost:5000/tablet (tablet de campo)
-
-2. En la pestaña TABLET:
-   - Selecciona la Cuadrilla Nº 1
-   - Presiona "INICIO CUADRILLA"
-   - Verás el dashboard actualizarse automáticamente en 3 segundos
-
-3. Para reiniciar la demo:
-   - En el dashboard, presiona el botón "Reset Demo"
+| Ruta                | Descripción                                      |
+|----------------------|--------------------------------------------------|
+| /login               | Inicio de sesión                                 |
+| /dashboard           | Centro de control ejecutivo en tiempo real       |
+| /recorridos          | Gestión de recorridos procesionales              |
+| /cuadrillas          | Configuración de cuadrillas y tiempos            |
+| /homenajes           | Gestión de homenajes programados                 |
+| /tablet              | Interfaz de campo para cronometristas            |
+| /mapa                | Seguimiento en vivo sobre el mapa                |
+| /reporte/marcaciones | Reporte imprimible de todos los eventos          |
+| /usuarios            | Gestión de usuarios y roles                      |
+| /auditoria           | Historial de acciones (solo Super Admin)         |
 
 ---
 
@@ -81,38 +104,28 @@ http://localhost:5000
 
 ```
 procesional/
-├── app.py                  ← Servidor principal Flask
-├── requirements.txt        ← Dependencias Python
-├── README.md               ← Este archivo
-├── data/                   ← Base de datos (archivos JSON)
-│   ├── recorridos.json
-│   ├── cuadrillas.json
-│   ├── homenajes.json
-│   ├── eventos.json
-│   └── usuarios.json
-├── templates/              ← Páginas HTML
-│   ├── base.html           ← Layout base con navbar
-│   ├── login.html
-│   ├── dashboard.html
-│   ├── tablet.html
-│   ├── recorridos.html
-│   ├── nuevo_recorrido.html
-│   ├── cuadrillas.html
-│   └── homenajes.html
-└── static/
-    ├── css/main.css        ← Estilos (morado nazareno + dorado)
-    └── js/main.js
+├── config/                 ← Proyecto Django (settings, urls, wsgi)
+├── cuentas/                ← Usuarios, roles/permisos y auditoría
+├── gestion/                ← Recorridos, cuadrillas, homenajes, eventos, reportes
+├── templates/              ← Plantillas Django (una por pantalla)
+├── static/
+│   ├── css/main.css        ← Estilos (morado nazareno + dorado)
+│   └── js/main.js
+├── requirements.txt
+├── Dockerfile / entrypoint.sh / docker-compose.yml / nginx.conf
+├── render.yaml
+└── .env.example
 ```
 
 ---
 
 ## DATOS PRE-CARGADOS
 
-Al ejecutar por primera vez se crean automáticamente:
-- 2 recorridos procesionales (2024)
-- 10 cuadrillas del Primer Recorrido
+La migración de datos (`gestion/migrations/0002_seed_datos.py` y
+`cuentas/migrations/0002_seed_usuarios.py`) crea, la primera vez:
+- 2 recorridos procesionales de ejemplo
+- 21 cuadrillas del Primer Recorrido
 - 5 homenajes programados
-- 3 usuarios de prueba
+- 4 usuarios de prueba (ver tabla arriba)
 
-Para reiniciar los datos, elimina los archivos dentro de la carpeta `data/`
-y vuelve a ejecutar `python app.py`.
+Todo se guarda en PostgreSQL real (no hay archivos JSON ni datos en disco).

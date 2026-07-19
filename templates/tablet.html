@@ -1,23 +1,22 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Tablet de Campo{% endblock %}
 {% block content %}
 <div class="tablet-page">
   <div class="tablet-header">
     <div style="font-size:28px">✝</div>
     <h1>Control de Campo</h1>
-    {% set es_superadmin = usuario.rol in ['Administrador General', 'Super Admin'] %}
-    {% if es_superadmin %}
+    {% if user.rol == 'Super Admin' %}
     <p style="margin-bottom:4px">
       <span style="background:rgba(212,175,55,0.3);border:1px solid rgba(212,175,55,0.7);color:#D4AF37;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:0.5px">
         ★ ADMINISTRADOR TOTAL
       </span>
     </p>
     {% endif %}
-    <p>{{ usuario.rol }}: {{ usuario.nombre }}</p>
+    <p>{{ user.rol }}: {{ user.nombre }}</p>
     <p id="t-recorrido-label" style="font-size:13px;color:rgba(212,175,55,0.9);margin-top:4px;font-weight:600">Sin recorrido seleccionado</p>
   </div>
 
-  <!-- Estado actual -->
   <div class="tablet-status">
     <div class="tablet-stat">
       <div class="val" id="t-cuadrilla">–</div>
@@ -37,7 +36,6 @@
     </div>
   </div>
 
-  <!-- ① Selección de RECORRIDO — obligatorio antes de todo -->
   <div id="bloque-recorrido" style="background:rgba(212,175,55,0.15);border:2px solid rgba(212,175,55,0.5);border-radius:10px;padding:14px;margin-bottom:16px">
     <label style="color:var(--dorado,#D4AF37);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px;font-weight:700">
       <i class="fa fa-route"></i>&nbsp; Recorrido activo — selecciona antes de registrar
@@ -55,7 +53,6 @@
     </select>
   </div>
 
-  <!-- ② Selección de cuadrilla activa (se llena por JS según recorrido) -->
   <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px">
     <label style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar cuadrilla</label>
     <select id="sel-cuadrilla" onchange="actualizarPanelTiempoCuadrilla()" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:#fff">
@@ -63,7 +60,6 @@
     </select>
   </div>
 
-  <!-- Panel de tiempo por cuadrilla (toma y deja + contador en vivo) -->
   <div id="panel-tiempo-cuadrilla" style="display:none;background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
     <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:10px">
       <span>Toma: <strong id="pt-toma" style="color:#fff">–</strong></span>
@@ -75,7 +71,6 @@
     <div id="pt-restante-label" style="font-size:13px;color:rgba(255,255,255,0.75);margin-top:4px">Selecciona una cuadrilla para ver su tiempo</div>
   </div>
 
-  <!-- ③ Selección de homenaje (se llena por JS según recorrido) -->
   <div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:14px;margin-bottom:20px">
     <label style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:8px">Seleccionar homenaje</label>
     <select id="sel-homenaje" style="width:100%;padding:10px;border-radius:8px;border:none;font-size:14px;background:#fff">
@@ -83,7 +78,6 @@
     </select>
   </div>
 
-  <!-- Botones de acción -->
   <div class="btn-grid">
     <button class="btn-tablet inicio-cua" onclick="registrar('inicio_cuadrilla')">
       <i class="fa fa-play"></i>INICIO CUADRILLA
@@ -114,7 +108,6 @@
     </button>
   </div>
 
-  <!-- Log local -->
   <div style="color:rgba(255,255,255,0.7);font-size:12px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
     <i class="fa fa-clock"></i> Últimos eventos registrados
   </div>
@@ -122,11 +115,9 @@
     <div class="log-item"><span style="color:rgba(255,255,255,0.4)">Sin eventos aún en esta sesión</span></div>
   </div>
 
-  <!-- Toast -->
   <div id="toast" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.3)"></div>
 </div>
 
-<!-- Modal observación -->
 <div class="modal-overlay" id="modal-obs">
   <div class="modal">
     <h3><i class="fa fa-note-sticky" style="color:var(--morado)"></i> Registrar Observación</h3>
@@ -144,24 +135,21 @@
 
 {% block scripts %}
 <script>
-// ── Datos de todos los recorridos embebidos ──────────────────
-const CUADRILLAS_ALL = {{ cuadrillas | tojson }};
-const HOMENAJES_ALL  = {{ homenajes  | tojson }};
+const CUADRILLAS_ALL = {{ cuadrillas_json|tojson }};
+const HOMENAJES_ALL  = {{ homenajes_json|tojson }};
 
 let gpsLat = null, gpsLng = null;
-let recorridoActivo = '';   // recorrido_id seleccionado
+let recorridoActivo = '';
 const logItems = [];
 
-// ── Reloj + contador de tiempo por cuadrilla ──────────────────
 setInterval(() => {
   document.getElementById('t-hora').textContent =
     new Date().toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   actualizarPanelTiempoCuadrilla();
 }, 1000);
 
-// ── Estado del servidor (cuadrilla activa + hora de inicio real) ──
-let cuadrillaActivaServer = null;   // {id, inicio}
-let cuadrillasFinalizadas = [];     // ids de cuadrillas con FIN CUADRILLA ya registrado
+let cuadrillaActivaServer = null;
+let cuadrillasFinalizadas = [];
 let estadoPollId = null;
 
 function iniciarPollEstado() {
@@ -188,10 +176,6 @@ async function actualizarEstadoServidor() {
   } catch (e) { /* silencioso: la tablet puede perder señal */ }
 }
 
-// ── Bloqueo de cuadrilla ya finalizada ────────────────────────
-// Una vez registrado FIN CUADRILLA, esa cuadrilla queda bloqueada para
-// nuevas modificaciones (inicio/fin cuadrilla, inicio/fin sector) hasta
-// que se seleccione otra cuadrilla u otro item (homenaje) en la tablet.
 function aplicarBloqueoCuadrilla(cid) {
   const bloqueada = !!cid && cuadrillasFinalizadas.includes(cid);
   document.querySelectorAll('.inicio-cua, .fin-cua, .inicio-sec, .fin-sec').forEach(btn => {
@@ -200,9 +184,7 @@ function aplicarBloqueoCuadrilla(cid) {
   return bloqueada;
 }
 
-// ── Panel de tiempo asignado / contador en vivo por cuadrilla ─
 function parseFechaServidor(s) {
-  // "YYYY-MM-DD HH:MM:SS" registrado en hora local del servidor
   const [fecha, hora] = s.split(' ');
   const [y, m, d]      = fecha.split('-').map(Number);
   const [hh, mm, ss]   = hora.split(':').map(Number);
@@ -278,7 +260,6 @@ function actualizarPanelTiempoCuadrilla() {
   }
 }
 
-// ── GPS ───────────────────────────────────────────────────────
 function obtenerGPS() {
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(pos => {
@@ -296,7 +277,6 @@ function obtenerGPS() {
 }
 obtenerGPS();
 
-// ── Cambiar recorrido — filtra cuadrillas y homenajes ─────────
 function cambiarRecorrido(rid) {
   recorridoActivo = rid;
   localStorage.setItem('tablet_recorrido', rid);
@@ -316,7 +296,6 @@ function cambiarRecorrido(rid) {
     return;
   }
 
-  // Cuadrillas del recorrido, ordenadas por número
   const cuas = CUADRILLAS_ALL
     .filter(c => c.recorrido_id === rid)
     .sort((a, b) => a.numero - b.numero);
@@ -325,14 +304,12 @@ function cambiarRecorrido(rid) {
       `<option value="${c.id}" data-nombre="${c.cuadrilla}" data-num="${c.numero}">Nº ${c.numero} – ${c.cuadrilla}</option>`
     ).join('');
 
-  // Homenajes del recorrido
   const homs = HOMENAJES_ALL.filter(h => h.recorrido_id === rid);
   selHom.innerHTML = '<option value="">-- Elige el homenaje --</option>' +
     homs.map(h =>
       `<option value="${h.id}" data-nombre="${h.nombre}">${h.nombre} (${h.tiempo_programado} min)</option>`
     ).join('');
 
-  // Mostrar nombre en header
   const sel = document.getElementById('sel-recorrido-tablet');
   const opt = sel.options[sel.selectedIndex];
   labelEl.textContent = '📍 ' + (opt ? opt.dataset.nombre || opt.textContent.trim() : '');
@@ -344,12 +321,10 @@ function cambiarRecorrido(rid) {
   mostrarToast('✓ Recorrido seleccionado. Cuadrillas y homenajes actualizados.', 'verde');
 }
 
-// ── Restaurar recorrido guardado ──────────────────────────────
 (function restaurar() {
   const saved = localStorage.getItem('tablet_recorrido');
   if (!saved) return;
   const sel = document.getElementById('sel-recorrido-tablet');
-  // Verificar que sigue existiendo en la lista
   const existe = Array.from(sel.options).some(o => o.value === saved);
   if (existe) {
     sel.value = saved;
@@ -357,7 +332,6 @@ function cambiarRecorrido(rid) {
   }
 })();
 
-// ── Tipos legibles ────────────────────────────────────────────
 const TIPOS_LABEL = {
   inicio_cuadrilla: '▶ Inicio cuadrilla',
   fin_cuadrilla:    '⏹ Fin cuadrilla',
@@ -370,9 +344,7 @@ const TIPOS_LABEL = {
   observacion:      '📝 Observación',
 };
 
-// ── Registrar evento ──────────────────────────────────────────
 async function registrar(tipo, obs = '') {
-  // Validar recorrido seleccionado
   if (!recorridoActivo) {
     mostrarToast('⚠️ Debes seleccionar un recorrido primero', 'naranja');
     document.getElementById('sel-recorrido-tablet').focus();
@@ -391,7 +363,6 @@ async function registrar(tipo, obs = '') {
     return;
   }
 
-  // Bloqueo: una cuadrilla con FIN CUADRILLA ya registrado no admite más eventos
   const tiposDeCuadrilla = ['inicio_cuadrilla', 'fin_cuadrilla', 'inicio_sector', 'fin_sector'];
   if (tiposDeCuadrilla.includes(tipo) && cuadrillasFinalizadas.includes(refId)) {
     mostrarToast('🔒 Esta cuadrilla ya fue finalizada. Selecciona otra cuadrilla o item para continuar.', 'naranja');
@@ -404,13 +375,13 @@ async function registrar(tipo, obs = '') {
     lat:            gpsLat,
     lng:            gpsLng,
     observacion:    obs,
-    recorrido_id:   recorridoActivo,   // ← siempre el recorrido seleccionado
+    recorrido_id:   recorridoActivo,
   };
 
   try {
     const resp = await fetch('/api/evento', {
       method:  'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
       body:    JSON.stringify(payload)
     });
     const data = await resp.json();

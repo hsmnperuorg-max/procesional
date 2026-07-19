@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Usuarios{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -33,11 +34,12 @@
               <i class="fa fa-pencil"></i>
             </button>
             <form method="POST" action="/usuarios/eliminar/{{ u.id }}" onsubmit="return confirm('¿Eliminar este usuario?')">
+              {% csrf_token %}
               <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
             </form>
           </td>
         </tr>
-        {% else %}
+        {% empty %}
         <tr><td colspan="4" style="text-align:center;color:var(--gris-text);padding:40px">No hay usuarios registrados.</td></tr>
         {% endfor %}
       </tbody>
@@ -53,10 +55,11 @@
     <table>
       <thead><tr><th>Rol</th><th>Secciones con acceso</th></tr></thead>
       <tbody>
-        <tr><td><span class="badge badge-morado">Super Admin</span></td><td>Todo el sistema, incluyendo Usuarios</td></tr>
+        <tr><td><span class="badge badge-morado">Super Admin</span></td><td>Todo el sistema, incluyendo Usuarios y Auditoría</td></tr>
         <tr><td><span class="badge badge-morado">Mayordomía</span></td><td>Dashboard y Mapa</td></tr>
         <tr><td><span class="badge badge-morado">Pro Secretario</span></td><td>Recorridos, Cuadrillas y Homenajes</td></tr>
         <tr><td><span class="badge badge-morado">Cronometrista</span></td><td>Tablet de Campo y Reportes</td></tr>
+        <tr><td><span class="badge badge-morado">Gestor de Usuarios</span></td><td>Usuarios</td></tr>
       </tbody>
     </table>
   </div>
@@ -66,7 +69,8 @@
 <div class="modal-overlay" id="modal-usr">
   <div class="modal">
     <h3><i class="fa fa-user-plus" style="color:var(--morado)"></i> Nuevo Usuario</h3>
-    <form method="POST" action="/usuarios/nuevo">
+    <form method="POST" action="{% url 'nuevo_usuario' %}">
+      {% csrf_token %}
       <div class="form-grid">
         <div class="form-group" style="grid-column:1/-1">
           <label>Nombre Completo</label>
@@ -78,7 +82,7 @@
         </div>
         <div class="form-group">
           <label>Contraseña</label>
-          <input type="text" name="password" placeholder="Contraseña" required>
+          <input type="password" name="password" placeholder="Contraseña" required>
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Rol / Perfil</label>
@@ -102,6 +106,7 @@
   <div class="modal">
     <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Usuario</h3>
     <form method="POST" id="form-edit-usr">
+      {% csrf_token %}
       <div class="form-grid">
         <div class="form-group" style="grid-column:1/-1">
           <label>Nombre Completo</label>
@@ -113,7 +118,7 @@
         </div>
         <div class="form-group">
           <label>Contraseña <span style="font-size:10px;color:var(--gris-text)">(dejar vacío para no cambiarla)</span></label>
-          <input type="text" name="password" id="edit-usr-password" placeholder="Nueva contraseña">
+          <input type="password" name="password" id="edit-usr-password" placeholder="Nueva contraseña">
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Rol / Perfil</label>
@@ -135,10 +140,11 @@
 
 {% block scripts %}
 <script>
-const USUARIOS_DATA = {{ usuarios | tojson }};
+// No incluye contraseñas: nunca se serializan al cliente.
+const USUARIOS_DATA = {{ usuarios|tojson }};
 
 function abrirEditarUsr(btn) {
-  const u = USUARIOS_DATA.find(x => x.id === btn.dataset.id);
+  const u = USUARIOS_DATA.find(x => String(x.id) === btn.dataset.id);
   if (!u) return;
   const form = document.getElementById('form-edit-usr');
   form.action = `/usuarios/editar/${u.id}`;

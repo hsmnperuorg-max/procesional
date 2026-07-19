@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Cuadrillas{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -15,11 +16,10 @@
   <div class="card-header">
     <h2><i class="fa fa-list"></i> Cuadrillas Registradas ({{ cuadrillas|length }})</h2>
     <span style="font-size:13px;color:var(--gris-text)">
-      Metros totales: <strong>{{ cuadrillas | sum(attribute='metraje') | int }} m</strong>
+      Metros totales: <strong>{{ metraje_total }} m</strong>
       &nbsp;·&nbsp;
-      {% set con_pos = cuadrillas | selectattr('lat') | list | length %}
-      <span style="color:{% if con_pos == cuadrillas|length %}var(--verde){% else %}var(--naranja){% endif %}">
-        <i class="fa fa-map-pin"></i> {{ con_pos }}/{{ cuadrillas|length }} con punto en mapa
+      <span style="color:{% if con_pos_count == cuadrillas|length %}var(--verde){% else %}var(--naranja){% endif %}">
+        <i class="fa fa-map-pin"></i> {{ con_pos_count }}/{{ cuadrillas|length }} con punto en mapa
       </span>
     </span>
   </div>
@@ -29,7 +29,7 @@
         <tr><th>#</th><th>Cuadrilla</th><th>Tipo</th><th>Hermandad Invitada</th><th>Ubicación / Punto</th><th>Metraje</th><th>T.Est.</th><th>Toma</th><th>Deja</th><th></th></tr>
       </thead>
       <tbody>
-        {% for c in cuadrillas | sort(attribute='numero') %}
+        {% for c in cuadrillas %}
         <tr>
           <td>
             <span style="background:var(--morado);color:white;padding:3px 10px;border-radius:12px;font-weight:700;font-size:13px">{{ c.numero }}</span>
@@ -52,7 +52,7 @@
             {% if c.ubicacion %}<div style="color:var(--gris-text)"><i class="fa fa-location-dot" style="color:var(--morado)"></i> {{ c.ubicacion }}</div>{% endif %}
             {% if c.lat and c.lng %}
               <div style="color:var(--verde);margin-top:2px">
-                <i class="fa fa-map-pin"></i> <span style="font-family:monospace;font-size:11px">{{ '%.5f'|format(c.lat) }}, {{ '%.5f'|format(c.lng) }}</span>
+                <i class="fa fa-map-pin"></i> <span style="font-family:monospace;font-size:11px">{{ c.lat|floatformat:5 }}, {{ c.lng|floatformat:5 }}</span>
               </div>
             {% else %}
               <div style="color:#ccc;margin-top:2px"><i class="fa fa-map-pin"></i> Sin punto en mapa</div>
@@ -60,19 +60,20 @@
           </td>
           <td>{{ c.metraje }} m</td>
           <td><span class="badge badge-morado">{{ c.tiempo_estimado }} min</span></td>
-          <td>{{ c.hora_toma }}</td>
-          <td>{{ c.hora_deja }}</td>
+          <td>{{ c.hora_toma|time:'H:i' }}</td>
+          <td>{{ c.hora_deja|time:'H:i' }}</td>
           <td style="display:flex;gap:6px">
             <button type="button" class="btn btn-sm btn-outline"
                     data-id="{{ c.id }}" onclick="abrirEditar(this)">
               <i class="fa fa-pencil"></i>
             </button>
-            <form method="POST" action="/cuadrillas/eliminar/{{ c.id }}" onsubmit="return confirm('¿Eliminar esta cuadrilla?')">
+            <form method="POST" action="{% url 'eliminar_cuadrilla' c.id %}" onsubmit="return confirm('¿Eliminar esta cuadrilla?')">
+              {% csrf_token %}
               <button type="submit" class="btn btn-sm btn-danger"><i class="fa fa-trash"></i></button>
             </form>
           </td>
         </tr>
-        {% else %}
+        {% empty %}
         <tr><td colspan="10" style="text-align:center;color:var(--gris-text);padding:40px">No hay cuadrillas registradas.</td></tr>
         {% endfor %}
       </tbody>
@@ -84,7 +85,8 @@
 <div class="modal-overlay" id="modal-cua">
   <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
     <h3><i class="fa fa-people-group" style="color:var(--morado)"></i> Nueva Cuadrilla</h3>
-    <form method="POST" action="/cuadrillas/nueva" id="form-cua">
+    <form method="POST" action="{% url 'nueva_cuadrilla' %}" id="form-cua">
+      {% csrf_token %}
       <input type="hidden" name="lat" id="new-lat">
       <input type="hidden" name="lng" id="new-lng">
       <div class="form-grid">
@@ -131,7 +133,6 @@
           <input type="text" name="ubicacion" placeholder="Ej: 6.3m. Antes de Av. Tacna 312 (SM)">
         </div>
 
-        <!-- ÚLTIMA CUADRILLA -->
         <div class="form-group" style="grid-column:1/-1">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
             <input type="checkbox" name="es_ultima" id="new-es-ultima" value="1"
@@ -155,11 +156,10 @@
                  style="border:2px solid var(--morado)">
         </div>
 
-        <!-- PUNTO EN MAPA -->
         <div class="form-group" style="grid-column:1/-1">
           <label><i class="fa fa-map-pin" style="color:var(--morado)"></i> Punto de Relevo en Mapa <span style="color:var(--morado);font-size:10px">(mismo lugar que el Punto de Toma, fijado en el mapa)</span></label>
           <div style="display:flex;align-items:center;gap:10px;background:#f8f5fc;border:1.5px solid #e0d0f0;border-radius:8px;padding:10px 14px">
-            <i class="fa fa-map-pin" style="color:{% if false %}var(--verde){% else %}#ccc{% endif %};font-size:18px" id="new-pin-icon"></i>
+            <i class="fa fa-map-pin" style="color:#ccc;font-size:18px" id="new-pin-icon"></i>
             <span id="new-coords-display" style="font-size:13px;color:var(--gris-text);flex:1">Sin punto seleccionado — haz clic en "Fijar en mapa"</span>
             <button type="button" class="btn btn-sm btn-outline" onclick="abrirPicker('new')">
               <i class="fa fa-crosshairs"></i> Fijar en mapa
@@ -197,6 +197,7 @@
   <div class="modal" style="max-width:600px;max-height:90vh;overflow-y:auto">
     <h3><i class="fa fa-pencil" style="color:var(--morado)"></i> Editar Cuadrilla</h3>
     <form method="POST" id="form-edit-cua">
+      {% csrf_token %}
       <input type="hidden" name="lat" id="edit-lat">
       <input type="hidden" name="lng" id="edit-lng">
       <div class="form-grid">
@@ -242,7 +243,6 @@
           <input type="text" name="ubicacion" id="edit-ubicacion" placeholder="Ej: 6.3m. Antes de Av. Tacna 312 (SM)">
         </div>
 
-        <!-- ÚLTIMA CUADRILLA -->
         <div class="form-group" style="grid-column:1/-1">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none">
             <input type="checkbox" name="es_ultima" id="edit-es-ultima" value="1"
@@ -266,7 +266,6 @@
                  style="border:2px solid var(--morado)">
         </div>
 
-        <!-- PUNTO EN MAPA -->
         <div class="form-group" style="grid-column:1/-1">
           <label><i class="fa fa-map-pin" style="color:var(--morado)"></i> Punto de Relevo en Mapa</label>
           <div style="display:flex;align-items:center;gap:10px;background:#f8f5fc;border:1.5px solid #e0d0f0;border-radius:8px;padding:10px 14px">
@@ -327,10 +326,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const CUADRILLAS_DATA = {{ cuadrillas | tojson }};
-const RUTAS = {{ rutas_json | tojson }};
+const CUADRILLAS_DATA = {{ cuadrillas_json|tojson }};
+const RUTAS = {{ rutas_json|tojson }};
 
-// ── MODAL NUEVA ───────────────────────────
 function abrirNueva() {
   document.getElementById('modal-cua').classList.add('open');
 }
@@ -355,14 +353,12 @@ document.getElementById('modal-cua').addEventListener('click', function(e) {
   if (e.target === this) cerrarModal();
 });
 
-// ── TOGGLE ÚLTIMA CUADRILLA ───────────────
 function toggleUltima(prefix, checked) {
   document.getElementById(`${prefix}-campo-deja`).style.display = checked ? 'block' : 'none';
   const inp = document.getElementById(`${prefix}-punto-deja`);
   if (inp) inp.required = checked;
 }
 
-// ── MODAL EDITAR ──────────────────────────
 function abrirEditar(btn) {
   const c = CUADRILLAS_DATA.find(x => x.id === btn.dataset.id);
   if (!c) return;
@@ -380,13 +376,11 @@ function abrirEditar(btn) {
   onEditTipoChange(c.tipo || 'regular');
   if (c.tipo === 'invitados') document.getElementById('edit-hermandad').value = c.hermandad_invitada || '';
 
-  // Cargar es_ultima / punto_deja
   const esUltimaChk = document.getElementById('edit-es-ultima');
   esUltimaChk.checked = !!c.es_ultima;
   toggleUltima('edit', !!c.es_ultima);
   document.getElementById('edit-punto-deja').value = c.punto_deja || '';
 
-  // Cargar coordenadas
   if (c.lat && c.lng) {
     document.getElementById('edit-lat').value = c.lat;
     document.getElementById('edit-lng').value = c.lng;
@@ -419,7 +413,6 @@ document.getElementById('modal-edit-cua').addEventListener('click', function(e) 
   if (e.target === this) cerrarModalEdit();
 });
 
-// ── MAPA PICKER ───────────────────────────
 let pickerTarget     = null;
 let pickerMap        = null;
 let pickerMarker     = null;
@@ -452,7 +445,6 @@ function abrirPicker(target) {
     }
     pickerMap.invalidateSize();
 
-    // Dibujar ruta del recorrido seleccionado como guía
     const ridEl = document.getElementById(target === 'new' ? 'new-recorrido' : 'edit-recorrido');
     const rid = ridEl?.value;
     if (pickerRouteLayer) { pickerMap.removeLayer(pickerRouteLayer); pickerRouteLayer = null; }
@@ -463,7 +455,6 @@ function abrirPicker(target) {
       pickerMap.fitBounds(pickerRouteLayer.getBounds(), { padding: [30, 30] });
     }
 
-    // Si ya tiene coords, mostrarlas y centrar
     const latEl = document.getElementById(target === 'new' ? 'new-lat' : 'edit-lat');
     const lngEl = document.getElementById(target === 'new' ? 'new-lng' : 'edit-lng');
     if (latEl.value && lngEl.value) {

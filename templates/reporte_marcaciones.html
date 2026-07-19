@@ -29,6 +29,7 @@
 .tb-cam  { background: #d8edf5; color: #005c8b; }
 .tb-obs  { background: #f5f5f5; color: #555; }
 .tb-otro { background: #f5d8d8; color: #8b0000; }
+.tb-sec  { background: #d0f0ea; color: #0e6655; }
 
 .dur-ok  { color: var(--verde, #27ae60); font-weight: 700; }
 .dur-late { color: var(--rojo, #c0392b); font-weight: 700; }
@@ -42,15 +43,13 @@
 .kpi-mini .lbl { font-size: 11px; color: #888; margin-top: 2px; }
 </style>
 
-<!-- Controles -->
 <div class="btn-herramientas" style="display:flex;gap:10px;margin-bottom:14px;align-items:center">
   <button class="btn btn-primary" onclick="window.print()">
     <i class="fa fa-print"></i> Imprimir / PDF
   </button>
-  <a href="/dashboard" class="btn btn-outline btn-sm"><i class="fa fa-arrow-left"></i> Volver</a>
+  <a href="{% url 'dashboard' %}" class="btn btn-outline btn-sm"><i class="fa fa-arrow-left"></i> Volver</a>
 </div>
 
-<!-- ENCABEZADO -->
 <div style="background:#4B1462;color:white;padding:12px 20px;border-radius:6px;margin-bottom:16px">
   <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;opacity:0.75">
     Hermandad del Señor de los Milagros de Nazarenas
@@ -63,17 +62,9 @@
   </div>
 </div>
 
-<!-- KPIs -->
-{% set n_cua  = registros | selectattr('tipo','in',['fin_cuadrilla']) | list | length %}
-{% set n_hom  = registros | selectattr('tipo','eq','fin_homenaje')  | list | length %}
-{% set n_cam  = registros | selectattr('tipo','eq','fin_cambio')    | list | length %}
-{% set n_sec  = registros | selectattr('tipo','eq','fin_sector')    | list | length %}
-{% set n_obs  = eventos   | selectattr('tipo','eq','observacion')   | list | length %}
-{% set total  = eventos | length %}
-
 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
   <div class="kpi-mini">
-    <div class="val">{{ total }}</div>
+    <div class="val">{{ eventos|length }}</div>
     <div class="lbl">Total Eventos</div>
   </div>
   <div class="kpi-mini">
@@ -98,8 +89,6 @@
   </div>
 </div>
 
-<!-- SECCIÓN CUADRILLAS -->
-{% set reg_cua = registros | selectattr('tipo','eq','fin_cuadrilla') | list %}
 {% if reg_cua %}
 <div class="card" style="margin-bottom:16px">
   <div class="card-header">
@@ -121,34 +110,25 @@
       </thead>
       <tbody>
         {% for r in reg_cua %}
-        {% set cua_obj = cua_idx.get(r.ref_id) %}
-        {% set est = cua_obj.tiempo_estimado if cua_obj else None %}
-        {% set dif = (r.duracion - est) if (r.duracion is not none and est) else None %}
         <tr>
-          <td>
-            {% if cua_obj %}
-              <strong>#{{ cua_obj.numero }}</strong> — {{ cua_obj.cuadrilla }}
-            {% else %}
-              {{ r.ref_nombre or r.ref_id or '–' }}
-            {% endif %}
-          </td>
-          <td class="text-center" style="font-weight:700;text-align:center">{{ r.hora_inicio }}</td>
-          <td class="text-center" style="font-weight:700;text-align:center">{{ r.hora_fin }}</td>
+          <td>{{ r.ref_nombre|default:'–' }}</td>
+          <td style="font-weight:700;text-align:center">{{ r.hora_inicio }}</td>
+          <td style="font-weight:700;text-align:center">{{ r.hora_fin }}</td>
           <td style="text-align:center;font-weight:700;color:#4B1462">
-            {% if r.duracion is not none %}{{ r.duracion }} min{% else %}–{% endif %}
+            {% if r.duracion != None %}{{ r.duracion }} min{% else %}–{% endif %}
           </td>
           <td style="text-align:center;color:#888">
-            {% if est %}{{ est }} min{% else %}–{% endif %}
+            {% if r.estimado %}{{ r.estimado }} min{% else %}–{% endif %}
           </td>
           <td style="text-align:center">
-            {% if dif is not none %}
-              <span class="{{ 'dur-late' if dif > 5 else 'dur-ok' }}">
-                {{ '+' if dif > 0 else '' }}{{ dif }} min
+            {% if r.diferencia != None %}
+              <span class="{% if r.diferencia > 5 %}dur-late{% else %}dur-ok{% endif %}">
+                {% if r.diferencia > 0 %}+{% endif %}{{ r.diferencia }} min
               </span>
             {% else %}–{% endif %}
           </td>
           <td style="font-size:11px">{{ r.usuario }}</td>
-          <td style="font-size:11px;color:#888">{{ r.observacion or '–' }}</td>
+          <td style="font-size:11px;color:#888">{{ r.observacion|default:'–' }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -157,8 +137,6 @@
 </div>
 {% endif %}
 
-<!-- SECCIÓN HOMENAJES -->
-{% set reg_hom = registros | selectattr('tipo','eq','fin_homenaje') | list %}
 {% if reg_hom %}
 <div class="card page-break" style="margin-bottom:16px">
   <div class="card-header">
@@ -179,30 +157,20 @@
       </thead>
       <tbody>
         {% for r in reg_hom %}
-        {% set hom_obj = hom_idx.get(r.ref_id) %}
-        {% set est = hom_obj.tiempo_programado if hom_obj else None %}
-        {% set dif = (r.duracion - est) if (r.duracion is not none and est) else None %}
         <tr>
-          <td>
-            {% if hom_obj %}
-              <strong>{{ hom_obj.nombre }}</strong>
-              {% if hom_obj.ubicacion %}<br><span style="font-size:10.5px;color:#888">{{ hom_obj.ubicacion }}</span>{% endif %}
-            {% else %}
-              {{ r.ref_nombre or r.ref_id or '–' }}
-            {% endif %}
-          </td>
+          <td>{{ r.ref_nombre|default:'–' }}</td>
           <td style="text-align:center;font-weight:700">{{ r.hora_inicio }}</td>
           <td style="text-align:center;font-weight:700">{{ r.hora_fin }}</td>
           <td style="text-align:center;font-weight:700;color:#8b5e00">
-            {% if r.duracion is not none %}{{ r.duracion }} min{% else %}–{% endif %}
+            {% if r.duracion != None %}{{ r.duracion }} min{% else %}–{% endif %}
           </td>
           <td style="text-align:center;color:#888">
-            {% if est %}{{ est }} min{% else %}–{% endif %}
+            {% if r.estimado %}{{ r.estimado }} min{% else %}–{% endif %}
           </td>
           <td style="text-align:center">
-            {% if dif is not none %}
-              <span class="{{ 'dur-late' if dif > 3 else 'dur-ok' }}">
-                {{ '+' if dif > 0 else '' }}{{ dif }} min
+            {% if r.diferencia != None %}
+              <span class="{% if r.diferencia > 3 %}dur-late{% else %}dur-ok{% endif %}">
+                {% if r.diferencia > 0 %}+{% endif %}{{ r.diferencia }} min
               </span>
             {% else %}–{% endif %}
           </td>
@@ -215,8 +183,6 @@
 </div>
 {% endif %}
 
-<!-- SECCIÓN CAMBIOS -->
-{% set reg_cam = registros | selectattr('tipo','eq','fin_cambio') | list %}
 {% if reg_cam %}
 <div class="card" style="margin-bottom:16px">
   <div class="card-header">
@@ -237,14 +203,14 @@
       <tbody>
         {% for r in reg_cam %}
         <tr>
-          <td>{{ r.ref_nombre or r.ref_id or '–' }}</td>
+          <td>{{ r.ref_nombre|default:'–' }}</td>
           <td style="text-align:center;font-weight:700">{{ r.hora_inicio }}</td>
           <td style="text-align:center;font-weight:700">{{ r.hora_fin }}</td>
           <td style="text-align:center;font-weight:700;color:#005c8b">
-            {% if r.duracion is not none %}{{ r.duracion }} min{% else %}–{% endif %}
+            {% if r.duracion != None %}{{ r.duracion }} min{% else %}–{% endif %}
           </td>
           <td style="font-size:11px">{{ r.usuario }}</td>
-          <td style="font-size:11px;color:#888">{{ r.observacion or '–' }}</td>
+          <td style="font-size:11px;color:#888">{{ r.observacion|default:'–' }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -253,8 +219,6 @@
 </div>
 {% endif %}
 
-<!-- SECCIÓN SECTORES -->
-{% set reg_sec = registros | selectattr('tipo','eq','fin_sector') | list %}
 {% if reg_sec %}
 <div class="card" style="margin-bottom:16px">
   <div class="card-header">
@@ -276,9 +240,7 @@
         {% for r in reg_sec %}
         <tr>
           <td>
-            <strong style="color:#16a085">
-              {{ r.ref_nombre or ('Sector ' ~ r.sector_numero) if r.sector_numero else 'Sector –' }}
-            </strong>
+            <strong style="color:#16a085">{{ r.ref_nombre|default:'Sector –' }}</strong>
           </td>
           <td style="font-size:12px;color:var(--morado-oscuro)">
             {% if r.cua_numero %}
@@ -290,7 +252,7 @@
           <td style="text-align:center;font-weight:700">{{ r.hora_inicio }}</td>
           <td style="text-align:center;font-weight:700">{{ r.hora_fin }}</td>
           <td style="text-align:center;font-weight:700;color:#16a085">
-            {% if r.duracion is not none %}{{ r.duracion }} min{% else %}–{% endif %}
+            {% if r.duracion != None %}{{ r.duracion }} min{% else %}–{% endif %}
           </td>
           <td style="font-size:11px">{{ r.usuario }}</td>
         </tr>
@@ -301,8 +263,6 @@
 </div>
 {% endif %}
 
-<!-- SECCIÓN OBSERVACIONES -->
-{% set reg_obs = registros | selectattr('tipo','eq','observacion') | list %}
 {% if reg_obs %}
 <div class="card" style="margin-bottom:16px">
   <div class="card-header">
@@ -321,7 +281,7 @@
         {% for r in reg_obs %}
         <tr>
           <td style="text-align:center;font-weight:700">{{ r.hora_inicio }}</td>
-          <td>{{ r.observacion or '–' }}</td>
+          <td>{{ r.observacion|default:'–' }}</td>
           <td style="font-size:11px">{{ r.usuario }}</td>
         </tr>
         {% endfor %}
@@ -331,7 +291,6 @@
 </div>
 {% endif %}
 
-<!-- LOG COMPLETO -->
 <div class="card page-break">
   <div class="card-header">
     <h2><i class="fa fa-clock-rotate-left"></i> Registro Cronológico Completo ({{ eventos|length }} eventos)</h2>
@@ -348,44 +307,15 @@
         </tr>
       </thead>
       <tbody>
-        {% for e in eventos %}
-        {% set ref_id = e.get('referencia_id','') %}
-        {% set ref_name = '' %}
-        {% if ref_id in cua_idx %}
-          {% set ref_name = 'Cua. ' ~ cua_idx[ref_id].numero ~ ' – ' ~ cua_idx[ref_id].cuadrilla %}
-        {% elif ref_id in hom_idx %}
-          {% set ref_name = hom_idx[ref_id].nombre %}
-        {% elif e.tipo in ['inicio_sector','fin_sector'] and e.get('sector_numero') %}
-          {% set ref_name = 'Sector ' ~ e.sector_numero %}
-        {% endif %}
+        {% for e in eventos_view %}
         <tr>
-          <td style="font-size:11px;white-space:nowrap">{{ e.fecha_hora }}</td>
-          <td>
-            {% if e.tipo == 'inicio_cuadrilla' %}
-              <span class="tipo-badge tb-cua">▶ Inicio Cua.</span>
-            {% elif e.tipo == 'fin_cuadrilla' %}
-              <span class="tipo-badge tb-cua">⏹ Fin Cua.</span>
-            {% elif e.tipo == 'inicio_homenaje' %}
-              <span class="tipo-badge tb-hom">🙏 Inicio Hom.</span>
-            {% elif e.tipo == 'fin_homenaje' %}
-              <span class="tipo-badge tb-hom">✓ Fin Hom.</span>
-            {% elif e.tipo == 'inicio_cambio' %}
-              <span class="tipo-badge tb-cam">🔄 Inicio Cambio</span>
-            {% elif e.tipo == 'fin_cambio' %}
-              <span class="tipo-badge tb-cam">✓ Fin Cambio</span>
-            {% elif e.tipo == 'inicio_sector' %}
-              <span class="tipo-badge" style="background:#d0f0ea;color:#0e6655">📍 Inicio Sector</span>
-            {% elif e.tipo == 'fin_sector' %}
-              <span class="tipo-badge" style="background:#d0f0ea;color:#0e6655">🏁 Fin Sector</span>
-            {% else %}
-              <span class="tipo-badge tb-obs">📝 {{ e.tipo }}</span>
-            {% endif %}
-          </td>
-          <td style="font-size:11px">{{ ref_name or ref_id or '–' }}</td>
-          <td style="font-size:11px">{{ e.usuario or '–' }}</td>
-          <td style="font-size:11px;color:#888">{{ e.observacion or '–' }}</td>
+          <td style="font-size:11px;white-space:nowrap">{{ e.fecha_hora|date:'Y-m-d H:i:s' }}</td>
+          <td><span class="tipo-badge {{ e.badge_class }}">{{ e.badge_label }}</span></td>
+          <td style="font-size:11px">{{ e.ref_label }}</td>
+          <td style="font-size:11px">{{ e.usuario|default:'–' }}</td>
+          <td style="font-size:11px;color:#888">{{ e.observacion|default:'–' }}</td>
         </tr>
-        {% else %}
+        {% empty %}
         <tr>
           <td colspan="5" style="text-align:center;padding:28px;color:#ccc">
             Aún no hay eventos registrados desde la tablet.

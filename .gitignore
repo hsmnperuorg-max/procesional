@@ -2,5 +2,6 @@ __pycache__/
 *.pyc
 venv/
 .claude/
--w
-{templates,static/
+.env
+db.sqlite3
+staticfiles/

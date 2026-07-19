@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Iniciar Sesión{% endblock %}
 {% block content %}
 <div class="login-page">
   <div class="login-split">
-    <div class="login-brand" style="background-image:url('{{ url_for('static', filename='img/login.png') }}')"></div>
+    <div class="login-brand" style="background-image:url('{% static 'img/login.png' %}')"></div>
     <div class="login-form-side">
       <div class="login-box">
         <div class="login-logo">
@@ -13,7 +14,8 @@
         {% if error %}
         <div class="alert alert-error"><i class="fa fa-circle-exclamation"></i> {{ error }}</div>
         {% endif %}
-        <form method="POST" action="/login">
+        <form method="POST" action="{% url 'login' %}">
+          {% csrf_token %}
           <div class="form-group" style="margin-bottom:16px">
             <label>Usuario</label>
             <input type="text" name="usuario" placeholder="Ingresa tu usuario" required autofocus>
@@ -26,10 +28,6 @@
             <i class="fa fa-right-to-bracket"></i> Ingresar al Sistema
           </button>
         </form>
-        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eee;font-size:12px;color:#999;text-align:center;">
-          <strong>Usuarios de prueba:</strong><br>
-          admin / admin123 &nbsp;|&nbsp; cronometro1 / cron123 &nbsp;|&nbsp; director / dir123
-        </div>
       </div>
     </div>
   </div>

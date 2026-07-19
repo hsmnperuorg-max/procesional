@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load permisos_extras %}
 {% block title %}Toma y Deja – {{ recorrido.nombre }}{% endblock %}
 
 {% block content %}
@@ -59,12 +60,11 @@
 .hom-table tbody tr:nth-child(even) { background: #f8f3ff; }
 </style>
 
-<!-- Controles de pantalla (no se imprimen) -->
 <div class="btn-herramientas" style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
   <button class="btn btn-primary" onclick="window.print()">
     <i class="fa fa-print"></i> Imprimir / Guardar PDF
   </button>
-  <a href="/recorridos" class="btn btn-outline btn-sm"><i class="fa fa-arrow-left"></i> Volver</a>
+  <a href="{% url 'recorridos' %}" class="btn btn-outline btn-sm"><i class="fa fa-arrow-left"></i> Volver</a>
   {% if recorrido.ruta_coords %}
   <span style="font-size:12px;color:var(--gris-text)">
     <i class="fa fa-circle-info" style="color:var(--morado)"></i>
@@ -75,7 +75,6 @@
 
 <div class="rep-wrap">
 
-  <!-- ── ENCABEZADO ─────────────────────────── -->
   <div class="rep-header">
     <div style="display:flex;align-items:flex-start;gap:14px">
       <div style="background:rgba(255,255,255,0.15);padding:6px 12px;border-radius:6px;font-size:18px;font-weight:900;white-space:nowrap;align-self:center">
@@ -100,14 +99,13 @@
       </div>
       <div style="text-align:right;font-size:10.5px;line-height:1.9;opacity:0.9;white-space:nowrap">
         <div style="font-size:9px;opacity:0.7;text-transform:uppercase">Secretario</div>
-        <div style="font-weight:700">{{ recorrido.secretario or '—' }}</div>
+        <div style="font-weight:700">{{ recorrido.secretario|default:'—' }}</div>
         <div style="font-size:9px;opacity:0.7;text-transform:uppercase;margin-top:4px">Pro Sec.</div>
-        <div style="font-weight:700">{{ recorrido.pro_secretario or '—' }}</div>
+        <div style="font-weight:700">{{ recorrido.pro_secretario|default:'—' }}</div>
       </div>
     </div>
   </div>
 
-  <!-- ── TABLA TOMA Y DEJA ──────────────────── -->
   <table class="tyd-table">
     <thead>
       <tr>
@@ -120,52 +118,33 @@
       </tr>
     </thead>
     <tbody>
-      {% for c in cuadrillas %}
-        {# Toma: primera cuadrilla usa punto_inicio del recorrido; las siguientes usan su propia ubicacion #}
-        {% if loop.first %}
-          {% set punto_toma = recorrido.punto_inicio or 'Inicio del Recorrido Procesional' %}
-        {% else %}
-          {% set punto_toma = c.ubicacion or '—' %}
-        {% endif %}
-        {# Deja: ubicacion de la SIGUIENTE cuadrilla; si es la última, usa su propio punto_deja #}
-        {% set next_c = cuadrillas[loop.index] if loop.index < cuadrillas|length else none %}
-        {% if c.es_ultima and c.punto_deja %}
-          {% set punto_deja = c.punto_deja %}
-        {% elif next_c and next_c.ubicacion %}
-          {% set punto_deja = next_c.ubicacion %}
-        {% else %}
-          {% set punto_deja = '—' %}
-        {% endif %}
-        {% set homs_cua   = homs_por_cuadrilla.get(c.numero, []) %}
-        {% set total_hom  = homs_cua | sum(attribute='tiempo_programado') %}
-
-        <!-- Fila TOMA -->
+      {% for fila in filas %}
+        {% with c=fila.c %}
         <tr class="row-toma">
           <td rowspan="2" style="text-align:center;padding:6px 4px;border-bottom:2px solid #6E1E91">
             <div class="cua-cell">
               <div class="cua-num">{{ c.numero }}</div>
-              <div class="cua-nombre">{{ c.cuadrilla or ('Cuadrilla ' ~ c.numero) }}{% if c.tipo == 'invitados' and c.hermandad_invitada %}<br>{{ c.hermandad_invitada }}{% endif %}</div>
+              <div class="cua-nombre">{{ c.cuadrilla|default:c.numero }}{% if c.tipo == 'invitados' and c.hermandad_invitada %}<br>{{ c.hermandad_invitada }}{% endif %}</div>
             </div>
           </td>
-          <td class="hora-cell">{{ c.hora_toma or '–:–' }}</td>
-          <td><span class="toma-lbl">Toma:</span> {{ punto_toma }}</td>
-          <td class="metraje-cell" rowspan="2">{{ '%.2f'|format(c.metraje|float) }}</td>
+          <td class="hora-cell">{{ c.hora_toma|time:'H:i'|default:'–:–' }}</td>
+          <td><span class="toma-lbl">Toma:</span> {{ fila.punto_toma }}</td>
+          <td class="metraje-cell" rowspan="2">{{ c.metraje|floatformat:2 }}</td>
           <td class="tiempo-cell">Inicio</td>
           <td></td>
         </tr>
-        <!-- Fila DEJA -->
         <tr class="row-deja">
-          <td class="hora-cell">{{ c.hora_deja or '–:–' }}</td>
-          <td><span class="deja-lbl">Deja:</span> {{ punto_deja }}</td>
+          <td class="hora-cell">{{ c.hora_deja|time:'H:i'|default:'–:–' }}</td>
+          <td><span class="deja-lbl">Deja:</span> {{ fila.punto_deja }}</td>
           <td class="tiempo-cell">Final</td>
           <td class="hom-obs">
-            {% if total_hom > 0 %}
-              Total de Homenajes<br>{{ total_hom }} Min
+            {% if fila.total_hom > 0 %}
+              Total de Homenajes<br>{{ fila.total_hom }} Min
             {% endif %}
           </td>
         </tr>
-
-      {% else %}
+        {% endwith %}
+      {% empty %}
         <tr>
           <td colspan="6" style="text-align:center;padding:28px;color:#999">
             No hay cuadrillas registradas para este recorrido.
@@ -175,25 +154,22 @@
     </tbody>
   </table>
 
-  <!-- ── LEYENDA ─────────────────────────────── -->
   <div class="leyenda-box">
     <div class="head">Leyenda</div>
     <div class="body">
       <div>Significado de (SM) es: Según Marca</div>
       <div>Aprox. 40 minutos por cada cuadrilla (El Tiempo exacto lo dará el Capataz General)</div>
       <div>3 minutos por cambio de cuadrilla</div>
-      {% if cuadrillas %}
-        {% set metraje_prom = (cuadrillas | sum(attribute='metraje') / cuadrillas|length) | int %}
+      {% if filas %}
         <div>Metraje promedio por Cuadrilla: {{ metraje_prom }}m.</div>
       {% endif %}
     </div>
   </div>
 
-  <!-- ── HOMENAJES ───────────────────────────── -->
   {% if homenajes %}
   <div style="margin-top:20px;page-break-inside:avoid">
     <div class="hom-section-head">
-      <i class="fa fa-church"></i> Homenajes Programados ({{ homenajes|length }} · Total {{ homenajes|sum(attribute='tiempo_programado') }} min)
+      <i class="fa fa-church"></i> Homenajes Programados ({{ homenajes|length }} · Total {{ total_hom_tiempo }} min)
     </div>
     <table class="hom-table">
       <thead>
@@ -207,20 +183,20 @@
         </tr>
       </thead>
       <tbody>
-        {% for h in homenajes | sort(attribute='numero_cuadrilla') %}
+        {% for h in homenajes %}
         <tr>
           <td style="text-align:center;font-weight:700;color:#4B1462">
             {% if h.numero_cuadrilla %}#{{ h.numero_cuadrilla }}{% else %}—{% endif %}
           </td>
           <td><strong>{{ h.nombre }}</strong></td>
-          <td>{{ h.ubicacion or '—' }}</td>
+          <td>{{ h.ubicacion|default:'—' }}</td>
           <td style="text-align:center;font-weight:700">{{ h.tiempo_programado }} min</td>
           <td style="text-align:center">
             {% if h.prioridad == 'alta' %}<span style="color:#c0392b;font-weight:700">Alta</span>
             {% elif h.prioridad == 'media' %}<span style="color:#e67e22;font-weight:700">Media</span>
             {% else %}<span style="color:#888">Baja</span>{% endif %}
           </td>
-          <td style="color:#666">{{ h.observaciones or '—' }}</td>
+          <td style="color:#666">{{ h.observaciones|default:'—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -228,7 +204,6 @@
   </div>
   {% endif %}
 
-  <!-- ── MAPA DEL RECORRIDO ─────────────────── -->
   {% if recorrido.ruta_coords %}
   <div class="mapa-section" style="margin-top:24px">
     <div style="background:#4B1462;color:white;font-weight:700;padding:7px 14px;font-size:12px;border-radius:4px 4px 0 0">
@@ -242,7 +217,7 @@
   </div>
   {% endif %}
 
-</div><!-- /rep-wrap -->
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -250,13 +225,12 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const RUTA = {{ recorrido.ruta_coords | tojson }};
+const RUTA = {{ recorrido.ruta_coords|tojson }};
 
 const mapa = L.map('mapa-reporte', {
   zoomControl: true, attributionControl: true, scrollWheelZoom: false
 });
 
-// Tiles CartoDB Positron — fondo gris neutro, sin colores de OSM
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
   maxZoom: 19,
@@ -268,7 +242,6 @@ if (RUTA.length > 1) {
     color: '#6E1E91', weight: 6, opacity: 0.95, lineJoin: 'round', lineCap: 'round'
   }).addTo(mapa);
 
-  // Marcadores de inicio y fin
   const ini = RUTA[0];
   const fin = RUTA[RUTA.length - 1];
   L.circleMarker(ini, {
